@@ -82,6 +82,12 @@ TodoList/
 
 ![TodoList 设计图](./README.assets/todolist设计.jpg)
 
+![image-20250914151442551](./README.assets/image-20250914151442551.png)
+
+![image-20250914151457182](./README.assets/image-20250914151457182.png)
+
+
+
 ## 🔧 构建说明
 
 ### 环境要求
