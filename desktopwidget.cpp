@@ -18,6 +18,11 @@ DesktopWidget::DesktopWidget(QWidget *parent)
 {
     setupUI();
     setupTrayIcon();
+    
+    // 创建刷新定时器（必须在setupConnections之前）
+    m_refreshTimer = new QTimer(this);
+    m_refreshTimer->setInterval(30000); // 30秒刷新一次
+    
     setupConnections();
     
     // 设置窗口属性
@@ -28,9 +33,7 @@ DesktopWidget::DesktopWidget(QWidget *parent)
     // 加载窗口位置
     loadWindowPosition();
     
-    // 启动刷新定时器
-    m_refreshTimer = new QTimer(this);
-    m_refreshTimer->setInterval(30000); // 30秒刷新一次
+    // 启动定时器
     m_refreshTimer->start();
     
     applyStyles();
@@ -86,7 +89,15 @@ void DesktopWidget::setupTrayIcon()
     }
     
     m_trayIcon = new QSystemTrayIcon(this);
-    m_trayIcon->setIcon(QIcon(":/icons/todo.png")); // 需要添加图标资源
+    // 使用系统标准图标，避免资源文件依赖
+    QIcon trayIcon = style()->standardIcon(QStyle::SP_ComputerIcon);
+    if (trayIcon.isNull()) {
+        // 如果标准图标不可用，创建一个简单的图标
+        QPixmap pixmap(16, 16);
+        pixmap.fill(Qt::blue);
+        trayIcon = QIcon(pixmap);
+    }
+    m_trayIcon->setIcon(trayIcon);
     m_trayIcon->setToolTip("Todo List - 待办事项");
     
     // 创建托盘菜单
