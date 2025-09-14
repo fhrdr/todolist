@@ -56,8 +56,6 @@ private:
     QHBoxLayout *m_addLayout;
     QLineEdit *m_addLineEdit;
     QPushButton *m_addButton;
-    QPushButton *m_refreshButton;
-    QPushButton *m_settingsButton;
     
     // 系统托盘
     QSystemTrayIcon *m_trayIcon;

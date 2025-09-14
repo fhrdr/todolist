@@ -33,6 +33,7 @@ private slots:
     // 文件夹相关槽函数
     void onNewFolderClicked();
     void onFolderSelectionChanged();
+    void onDeleteFolderClicked();
     
     // 待办事项相关槽函数
     void onNewTodoClicked();

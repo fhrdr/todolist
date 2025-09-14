@@ -34,6 +34,7 @@ void MainWindow::setupConnections()
 {
     // 文件夹相关连接
     connect(ui->newFolderBtn, &QPushButton::clicked, this, &MainWindow::onNewFolderClicked);
+    connect(ui->deleteFolderBtn, &QPushButton::clicked, this, &MainWindow::onDeleteFolderClicked);
     connect(ui->folderListWidget, &QListWidget::currentRowChanged, this, &MainWindow::onFolderSelectionChanged);
     
     // 待办事项相关连接
@@ -89,6 +90,49 @@ void MainWindow::onFolderSelectionChanged()
         m_currentItem = nullptr;
         updateTodoList();
         clearDetailPanel();
+        
+        // 启用删除按钮
+        ui->deleteFolderBtn->setEnabled(true);
+    } else {
+        // 禁用删除按钮
+        ui->deleteFolderBtn->setEnabled(false);
+    }
+}
+
+void MainWindow::onDeleteFolderClicked()
+{
+    int currentRow = ui->folderListWidget->currentRow();
+    if (currentRow >= 0 && currentRow < m_folders.size()) {
+        QString folderName = m_folders[currentRow].getName();
+        
+        // 确认删除
+        int ret = QMessageBox::question(this, "删除文件夹", 
+                                      QString("确定要删除文件夹 '%1' 吗？\n此操作将删除文件夹内的所有待办事项。").arg(folderName),
+                                      QMessageBox::Yes | QMessageBox::No);
+        
+        if (ret == QMessageBox::Yes) {
+            // 删除文件夹
+            m_folders.removeAt(currentRow);
+            
+            // 重置当前选择
+            m_currentFolder = nullptr;
+            m_currentItem = nullptr;
+            
+            // 更新界面
+            updateFolderList();
+            updateTodoList();
+            clearDetailPanel();
+            updateDesktopWidget();
+            updateCalendarWidget();
+            
+            // 保存数据
+            saveData();
+            
+            // 如果没有文件夹了，禁用删除按钮
+            if (m_folders.isEmpty()) {
+                ui->deleteFolderBtn->setEnabled(false);
+            }
+        }
     }
 }
 
@@ -106,6 +150,7 @@ void MainWindow::onNewTodoClicked()
         TodoItem newItem(title);
         m_currentFolder->addItem(newItem);
         updateTodoList();
+        updateFolderList();
         updateCalendarWidget();
         updateDesktopWidget();
         saveData();
@@ -123,7 +168,9 @@ void MainWindow::onTodoSelectionChanged()
     QList<TodoItem> items = m_currentFolder->getItems();
     
     if (currentRow >= 0 && currentRow < items.size()) {
-        m_currentItem = m_currentFolder->findItem(items[currentRow].getId());
+        // 直接使用items中的引用，避免索引不匹配问题
+        QString itemId = items[currentRow].getId();
+        m_currentItem = m_currentFolder->findItem(itemId);
         updateDetailPanel();
     } else {
         m_currentItem = nullptr;
@@ -133,13 +180,34 @@ void MainWindow::onTodoSelectionChanged()
 
 void MainWindow::onSaveClicked()
 {
-    if (!m_currentItem) return;
+    if (!m_currentItem || !m_currentFolder) return;
     
+    // 临时断开信号连接，防止递归调用
+    ui->todoListWidget->blockSignals(true);
+    
+    QString currentItemId = m_currentItem->getId();
     m_currentItem->setTitle(ui->titleEdit->text());
     m_currentItem->setDetails(ui->detailsEdit->toPlainText());
     m_currentItem->setCompleted(ui->completedCheckBox->isChecked());
     
+    // 更新列表但保持选中状态
     updateTodoList();
+    
+    // 恢复选中状态
+    QList<TodoItem> items = m_currentFolder->getItems();
+    for (int i = 0; i < items.size(); ++i) {
+        if (items[i].getId() == currentItemId) {
+            ui->todoListWidget->setCurrentRow(i);
+            // 重新获取当前项目指针
+            m_currentItem = m_currentFolder->findItem(currentItemId);
+            break;
+        }
+    }
+    
+    // 恢复信号连接
+    ui->todoListWidget->blockSignals(false);
+    
+    updateFolderList();
     updateCalendarWidget();
     updateDesktopWidget();
     saveData();
@@ -159,6 +227,7 @@ void MainWindow::onDeleteClicked()
         m_currentItem = nullptr;
         updateTodoList();
         clearDetailPanel();
+        updateFolderList();
         updateCalendarWidget();
         updateDesktopWidget();
         saveData();
@@ -169,13 +238,40 @@ void MainWindow::onDeleteClicked()
 
 void MainWindow::onCompletedToggled(bool completed)
 {
-    if (m_currentItem) {
-        m_currentItem->setCompleted(completed);
-        updateTodoList();
-        updateCalendarWidget();
-        updateDesktopWidget();
-        saveData();
+    if (!m_currentItem || !m_currentFolder) return;
+    
+    // 临时断开信号连接，防止递归调用
+    ui->todoListWidget->blockSignals(true);
+    
+    QString currentItemId = m_currentItem->getId();
+    m_currentItem->setCompleted(completed);
+    
+    // 更新列表但保持选中状态
+    updateTodoList();
+    
+    // 恢复选中状态
+    QList<TodoItem> items = m_currentFolder->getItems();
+    for (int i = 0; i < items.size(); ++i) {
+        if (items[i].getId() == currentItemId) {
+            ui->todoListWidget->setCurrentRow(i);
+            // 重新获取当前项目指针
+            m_currentItem = m_currentFolder->findItem(currentItemId);
+            break;
+        }
     }
+    
+    // 恢复信号连接
+    ui->todoListWidget->blockSignals(false);
+    
+    // 更新详情面板以反映完成状态变化
+    if (m_currentItem) {
+        updateDetailPanel();
+    }
+    
+    updateFolderList();
+    updateCalendarWidget();
+    updateDesktopWidget();
+    saveData();
 }
 
 void MainWindow::onSyncClicked()
@@ -247,8 +343,17 @@ void MainWindow::onExitClicked()
 
 void MainWindow::onDesktopWidgetClicked()
 {
-    // TODO: 实现桌面小贴士功能
-    QMessageBox::information(this, "桌面小贴士", "桌面小贴士功能将在后续版本中实现");
+    if (m_desktopWidget) {
+        if (m_desktopWidget->isVisible()) {
+            // 隐藏桌面小窗口
+            m_desktopWidget->hide();
+            ui->actionDesktopWidget->setText("显示桌面小贴士");
+        } else {
+            // 显示桌面小窗口
+            m_desktopWidget->show();
+            ui->actionDesktopWidget->setText("隐藏桌面小贴士");
+        }
+    }
 }
 
 void MainWindow::setupDesktopWidget()
@@ -265,6 +370,9 @@ void MainWindow::setupDesktopWidget()
     
     // 显示桌面小贴士
     m_desktopWidget->show();
+    
+    // 初始化菜单文本
+    ui->actionDesktopWidget->setText("隐藏桌面小贴士");
 }
 
 void MainWindow::updateDesktopWidget()
@@ -288,6 +396,7 @@ void MainWindow::onDesktopNewTodo(const QString &title)
         
         // 更新界面
         updateTodoList();
+        updateFolderList();
         updateDesktopWidget();
         saveData();
     }
@@ -305,6 +414,7 @@ void MainWindow::onDesktopTodoToggled(const QString &itemId, bool completed)
                 
                 // 更新界面
                 updateTodoList();
+                updateFolderList();
                 updateDesktopWidget();
                 saveData();
                 return;
@@ -384,6 +494,7 @@ void MainWindow::onCalendarTodoToggled(const QString& itemId, bool completed)
                 
                 // 更新界面
                 updateTodoList();
+                updateFolderList();
                 updateCalendarWidget();
                 updateDesktopWidget();
                 saveData();
@@ -400,7 +511,7 @@ void MainWindow::updateFolderList()
     for (const TodoFolder &folder : m_folders) {
         QString displayText = QString("%1 (%2/%3)")
                              .arg(folder.getName())
-                             .arg(folder.getPendingCount())
+                             .arg(folder.getCompletedCount())
                              .arg(folder.getItemCount());
         ui->folderListWidget->addItem(displayText);
     }
@@ -439,9 +550,28 @@ void MainWindow::updateDetailPanel()
         return;
     }
     
+    // 安全检查UI控件是否存在
+    if (!ui->titleEdit || !ui->detailsEdit || !ui->createdTimeLabel || 
+        !ui->completedTimeLabel || !ui->completedTimeLabel_title || 
+        !ui->completedCheckBox || !ui->saveBtn || !ui->deleteBtn) {
+        return;
+    }
+    
     ui->titleEdit->setText(m_currentItem->getTitle());
     ui->detailsEdit->setPlainText(m_currentItem->getDetails());
     ui->createdTimeLabel->setText(m_currentItem->getCreatedTime().toString("yyyy-MM-dd hh:mm:ss"));
+    
+    // 显示完成时间
+    if (m_currentItem->isCompleted() && !m_currentItem->getCompletedTime().isNull()) {
+        ui->completedTimeLabel->setText(m_currentItem->getCompletedTime().toString("yyyy-MM-dd hh:mm:ss"));
+        ui->completedTimeLabel_title->setVisible(true);
+        ui->completedTimeLabel->setVisible(true);
+    } else {
+        ui->completedTimeLabel->setText("-");
+        ui->completedTimeLabel_title->setVisible(false);
+        ui->completedTimeLabel->setVisible(false);
+    }
+    
     ui->completedCheckBox->setChecked(m_currentItem->isCompleted());
     
     // 启用编辑控件
@@ -454,9 +584,19 @@ void MainWindow::updateDetailPanel()
 
 void MainWindow::clearDetailPanel()
 {
+    // 安全检查UI控件是否存在
+    if (!ui->titleEdit || !ui->detailsEdit || !ui->createdTimeLabel || 
+        !ui->completedTimeLabel || !ui->completedTimeLabel_title || 
+        !ui->completedCheckBox || !ui->saveBtn || !ui->deleteBtn) {
+        return;
+    }
+    
     ui->titleEdit->clear();
     ui->detailsEdit->clear();
     ui->createdTimeLabel->setText("-");
+    ui->completedTimeLabel->setText("-");
+    ui->completedTimeLabel_title->setVisible(false);
+    ui->completedTimeLabel->setVisible(false);
     ui->completedCheckBox->setChecked(false);
     
     // 禁用编辑控件

@@ -53,7 +53,7 @@ void DesktopWidget::setupUI()
     // 标题栏
     m_titleLabel = new QLabel("待办事项");
     m_titleLabel->setAlignment(Qt::AlignCenter);
-    m_titleLabel->setStyleSheet("font-weight: bold; font-size: 14px; color: #333;");
+    m_titleLabel->setStyleSheet("font-weight: bold; font-size: 14px; color: #333; padding: 5px;");
     m_mainLayout->addWidget(m_titleLabel);
     
     // 待办事项列表
@@ -71,15 +71,6 @@ void DesktopWidget::setupUI()
     m_addLayout->addWidget(m_addLineEdit);
     m_addLayout->addWidget(m_addButton);
     m_mainLayout->addLayout(m_addLayout);
-    
-    // 底部按钮布局
-    QHBoxLayout *bottomLayout = new QHBoxLayout();
-    m_refreshButton = new QPushButton("刷新");
-    m_settingsButton = new QPushButton("设置");
-    
-    bottomLayout->addWidget(m_refreshButton);
-    bottomLayout->addWidget(m_settingsButton);
-    m_mainLayout->addLayout(bottomLayout);
 }
 
 void DesktopWidget::setupTrayIcon()
@@ -124,8 +115,6 @@ void DesktopWidget::setupConnections()
     connect(m_addLineEdit, &QLineEdit::returnPressed, this, &DesktopWidget::onAddTodoClicked);
     connect(m_todoListWidget, &QListWidget::itemClicked, this, &DesktopWidget::onTodoItemClicked);
     connect(m_todoListWidget, &QListWidget::itemChanged, this, &DesktopWidget::onTodoItemChanged);
-    connect(m_refreshButton, &QPushButton::clicked, this, &DesktopWidget::refreshDisplay);
-    connect(m_settingsButton, &QPushButton::clicked, this, &DesktopWidget::onShowMainWindow);
     connect(m_refreshTimer, &QTimer::timeout, this, &DesktopWidget::onRefreshTimer);
 }
 
@@ -307,7 +296,7 @@ void DesktopWidget::paintEvent(QPaintEvent *event)
     painter.setRenderHint(QPainter::Antialiasing);
     
     // 绘制半透明背景
-    painter.setBrush(QBrush(QColor(255, 255, 255, 240)));
+    painter.setBrush(QBrush(QColor(255, 255, 255, 200)));
     painter.setPen(QPen(QColor(200, 200, 200), 2));
     painter.drawRoundedRect(rect().adjusted(1, 1, -1, -1), 10, 10);
     
