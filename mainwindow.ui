@@ -1,0 +1,509 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1200</width>
+    <height>800</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Todo List - 待办事项管理</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="mainLayout">
+    <item>
+     <widget class="QTabWidget" name="tabWidget">
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <widget class="QWidget" name="listTab">
+        <attribute name="title">
+         <string>📋 列表视图</string>
+        </attribute>
+       <layout class="QHBoxLayout" name="listTabLayout">
+        <property name="spacing">
+         <number>0</number>
+        </property>
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+        <item>
+         <widget class="QWidget" name="leftPanel" native="true">
+          <property name="minimumSize">
+           <size>
+            <width>250</width>
+            <height>0</height>
+           </size>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>300</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="styleSheet">
+            <string notr="true">QWidget#leftPanel {
+     background-color: #fafafa;
+     border-right: 1px solid #e0e0e0;
+ }</string>
+           </property>
+          <layout class="QVBoxLayout" name="leftLayout">
+           <property name="spacing">
+            <number>5</number>
+           </property>
+           <property name="leftMargin">
+            <number>10</number>
+           </property>
+           <property name="topMargin">
+            <number>10</number>
+           </property>
+           <property name="rightMargin">
+            <number>10</number>
+           </property>
+           <property name="bottomMargin">
+            <number>10</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="folderLabel">
+              <property name="text">
+               <string>📁 文件夹</string>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">font-weight: bold; font-size: 14px; color: #2c3e50; padding: 5px 0;</string>
+              </property>
+             </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="folderButtonLayout">
+             <item>
+              <widget class="QPushButton" name="newFolderBtn">
+                <property name="text">
+                 <string>➕ 新建</string>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>80</width>
+                  <height>16777215</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>创建新文件夹</string>
+                </property>
+               </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QListWidget" name="folderListWidget">
+             <property name="styleSheet">
+              <string notr="true">QListWidget {
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: white;
+}
+QListWidget::item {
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+}
+QListWidget::item:selected {
+    background-color: #e3f2fd;
+    color: #1976d2;
+}</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QWidget" name="middlePanel" native="true">
+          <property name="minimumSize">
+           <size>
+            <width>400</width>
+            <height>0</height>
+           </size>
+          </property>
+          <property name="styleSheet">
+            <string notr="true">QWidget#middlePanel {
+     background-color: white;
+     border-right: 1px solid #e0e0e0;
+ }</string>
+           </property>
+          <layout class="QVBoxLayout" name="middleLayout">
+           <property name="spacing">
+            <number>5</number>
+           </property>
+           <property name="leftMargin">
+            <number>10</number>
+           </property>
+           <property name="topMargin">
+            <number>10</number>
+           </property>
+           <property name="rightMargin">
+            <number>10</number>
+           </property>
+           <property name="bottomMargin">
+            <number>10</number>
+           </property>
+           <item>
+            <layout class="QHBoxLayout" name="todoHeaderLayout">
+             <item>
+              <widget class="QLabel" name="todoLabel">
+                <property name="text">
+                 <string>📝 待办事项</string>
+                </property>
+                <property name="styleSheet">
+                 <string notr="true">font-weight: bold; font-size: 14px; color: #2c3e50; padding: 5px 0;</string>
+                </property>
+               </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer_2">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item>
+              <widget class="QPushButton" name="newTodoBtn">
+                <property name="text">
+                 <string>➕ 新建</string>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>80</width>
+                  <height>16777215</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>创建新待办事项</string>
+                </property>
+               </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="syncBtn">
+                <property name="text">
+                 <string>🔄 同步</string>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>80</width>
+                  <height>16777215</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>同步数据</string>
+                </property>
+               </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QListWidget" name="todoListWidget">
+             <property name="styleSheet">
+              <string notr="true">QListWidget {
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: white;
+}
+QListWidget::item {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+}
+QListWidget::item:selected {
+    background-color: #e8f5e8;
+    color: #2e7d32;
+}</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QWidget" name="rightPanel" native="true">
+          <property name="minimumSize">
+           <size>
+            <width>350</width>
+            <height>0</height>
+           </size>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QWidget#rightPanel {
+    background-color: #fafafa;
+}</string>
+          </property>
+          <layout class="QVBoxLayout" name="rightLayout">
+           <property name="spacing">
+            <number>10</number>
+           </property>
+           <property name="leftMargin">
+            <number>15</number>
+           </property>
+           <property name="topMargin">
+            <number>15</number>
+           </property>
+           <property name="rightMargin">
+            <number>15</number>
+           </property>
+           <property name="bottomMargin">
+            <number>15</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="detailLabel">
+             <property name="text">
+              <string>📋 详情</string>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">font-weight: bold; font-size: 14px; color: #2c3e50; padding: 5px 0;</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QScrollArea" name="detailScrollArea">
+             <property name="widgetResizable">
+              <bool>true</bool>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">QScrollArea {
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: white;
+}</string>
+             </property>
+             <widget class="QWidget" name="detailContent">
+              <property name="geometry">
+               <rect>
+                <x>0</x>
+                <y>0</y>
+                <width>316</width>
+                <height>69</height>
+               </rect>
+              </property>
+              <layout class="QVBoxLayout" name="detailContentLayout">
+               <property name="spacing">
+                <number>10</number>
+               </property>
+               <item>
+                <widget class="QLabel" name="titleLabel">
+                 <property name="text">
+                  <string>📌 标题：</string>
+                 </property>
+                 <property name="styleSheet">
+                  <string notr="true">font-weight: bold; color: #34495e;</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLineEdit" name="titleEdit">
+                 <property name="placeholderText">
+                  <string>请输入标题</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="detailsLabel">
+                 <property name="text">
+                  <string>📄 详情：</string>
+                 </property>
+                 <property name="styleSheet">
+                  <string notr="true">font-weight: bold; color: #34495e;</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QTextEdit" name="detailsEdit">
+                 <property name="placeholderText">
+                  <string>请输入详细描述</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="timeLabel">
+                 <property name="text">
+                  <string>🕒 创建时间：</string>
+                 </property>
+                 <property name="styleSheet">
+                  <string notr="true">font-weight: bold; color: #34495e;</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="createdTimeLabel">
+                 <property name="text">
+                  <string>-</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QCheckBox" name="completedCheckBox">
+                 <property name="text">
+                  <string>✅ 已完成</string>
+                 </property>
+                 <property name="styleSheet">
+                  <string notr="true">font-size: 12px; color: #27ae60;</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <layout class="QHBoxLayout" name="buttonLayout">
+                 <item>
+                  <widget class="QPushButton" name="saveBtn">
+                   <property name="text">
+                    <string>💾 保存</string>
+                   </property>
+                   <property name="toolTip">
+                    <string>保存当前修改</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QPushButton" name="deleteBtn">
+                   <property name="text">
+                    <string>🗑️ 删除</string>
+                   </property>
+                   <property name="toolTip">
+                    <string>删除当前待办事项</string>
+                   </property>
+                   <property name="styleSheet">
+                    <string notr="true">QPushButton {
+    background-color: #f44336;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 3px;
+}
+QPushButton:hover {
+    background-color: #d32f2f;
+}</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item>
+                <spacer name="verticalSpacer">
+                 <property name="orientation">
+                  <enum>Qt::Vertical</enum>
+                 </property>
+                 <property name="sizeHint" stdset="0">
+                  <size>
+                   <width>20</width>
+                   <height>40</height>
+                  </size>
+                 </property>
+                </spacer>
+               </item>
+              </layout>
+             </widget>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="calendarTab">
+        <attribute name="title">
+         <string>📅 日历视图</string>
+        </attribute>
+       <layout class="QVBoxLayout" name="calendarTabLayout">
+        <item>
+         <widget class="QWidget" name="calendarContainer" native="true">
+          <property name="styleSheet">
+           <string notr="true">QWidget#calendarContainer {
+    background-color: #f8f9fa;
+}</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1200</width>
+     <height>25</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>文件</string>
+    </property>
+    <addaction name="actionImport"/>
+    <addaction name="actionExport"/>
+    <addaction name="separator"/>
+    <addaction name="actionExit"/>
+   </widget>
+   <widget class="QMenu" name="menuView">
+    <property name="title">
+     <string>视图</string>
+    </property>
+    <addaction name="actionDesktopWidget"/>
+   </widget>
+   <addaction name="menuFile"/>
+   <addaction name="menuView"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionImport">
+   <property name="text">
+    <string>导入</string>
+   </property>
+  </action>
+  <action name="actionExport">
+   <property name="text">
+    <string>导出</string>
+   </property>
+  </action>
+  <action name="actionExit">
+   <property name="text">
+    <string>退出</string>
+   </property>
+  </action>
+  <action name="actionDesktopWidget">
+   <property name="text">
+    <string>桌面小贴士</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
