@@ -53,12 +53,17 @@ void DesktopWidget::setupUI()
     // 标题栏
     m_titleLabel = new QLabel("待办事项");
     m_titleLabel->setAlignment(Qt::AlignCenter);
-    m_titleLabel->setStyleSheet("font-weight: bold; font-size: 14px; color: #333; padding: 5px;");
+    // 调整标题栏样式，设置高度
+    m_titleLabel->setFixedHeight(16);
+    m_titleLabel->setStyleSheet("font-weight: bold; font-size: 14px; color: #333; padding: 0px; margin: 0px;");
     m_mainLayout->addWidget(m_titleLabel);
     
     // 待办事项列表
     m_todoListWidget = new QListWidget();
     m_todoListWidget->setMaximumHeight(250);
+    // 设置待办事项列表每一列的高度
+    m_todoListWidget->setUniformItemSizes(true);
+    m_todoListWidget->setStyleSheet("QListWidget::item { height: 24px; }");
     m_mainLayout->addWidget(m_todoListWidget);
     
     // 添加新待办事项的布局
@@ -296,7 +301,7 @@ void DesktopWidget::paintEvent(QPaintEvent *event)
     painter.setRenderHint(QPainter::Antialiasing);
     
     // 绘制半透明背景
-    painter.setBrush(QBrush(QColor(255, 255, 255, 200)));
+    painter.setBrush(QBrush(QColor(255, 255, 255, 160)));
     painter.setPen(QPen(QColor(200, 200, 200), 2));
     painter.drawRoundedRect(rect().adjusted(1, 1, -1, -1), 10, 10);
     

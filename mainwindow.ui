@@ -341,7 +341,13 @@ QListWidget::item:selected {
                   <string>📌 标题：</string>
                  </property>
                  <property name="styleSheet">
-                  <string notr="true">font-weight: bold; color: #34495e;</string>
+                  <string notr="true">font-weight: bold; color: #34495e; margin-bottom: 2px;</string>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>16777215</width>
+                   <height>20</height>
+                  </size>
                  </property>
                 </widget>
                </item>
@@ -358,7 +364,13 @@ QListWidget::item:selected {
                   <string>📄 详情：</string>
                  </property>
                  <property name="styleSheet">
-                  <string notr="true">font-weight: bold; color: #34495e;</string>
+                  <string notr="true">font-weight: bold; color: #34495e; margin-bottom: 2px;</string>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>16777215</width>
+                   <height>20</height>
+                  </size>
                  </property>
                 </widget>
                </item>
@@ -375,7 +387,13 @@ QListWidget::item:selected {
                   <string>🕒 创建时间：</string>
                  </property>
                  <property name="styleSheet">
-                  <string notr="true">font-weight: bold; color: #34495e;</string>
+                  <string notr="true">font-weight: bold; color: #34495e; margin-bottom: 2px;</string>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>16777215</width>
+                   <height>20</height>
+                  </size>
                  </property>
                 </widget>
                </item>
@@ -392,7 +410,13 @@ QListWidget::item:selected {
                   <string>✅ 完成时间：</string>
                  </property>
                  <property name="styleSheet">
-                  <string notr="true">font-weight: bold; color: #34495e;</string>
+                  <string notr="true">font-weight: bold; color: #34495e; margin-bottom: 2px;</string>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>16777215</width>
+                   <height>20</height>
+                  </size>
                  </property>
                 </widget>
                </item>
