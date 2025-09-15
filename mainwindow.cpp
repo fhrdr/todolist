@@ -9,6 +9,10 @@ MainWindow::MainWindow(QWidget *parent)
     , m_currentFolder(nullptr)
     , m_currentItem(nullptr)
     , m_desktopWidget(nullptr)
+    , m_trayIcon(nullptr)
+    , m_trayMenu(nullptr)
+    , m_showAction(nullptr)
+    , m_exitAction(nullptr)
 {
     ui->setupUi(this);
     
@@ -19,6 +23,7 @@ MainWindow::MainWindow(QWidget *parent)
     setupDesktopWidget();
     setupCalendarWidget();
     updateCalendarWidget();
+    setupSystemTray();
 }
 
 MainWindow::~MainWindow()
@@ -713,5 +718,86 @@ void MainWindow::onCalendarTodoUpdated(const QString &itemId, const TodoItem &it
             updateDesktopWidget();
             break;
         }
+    }
+}
+
+void MainWindow::setupSystemTray()
+{
+    // 检查系统是否支持托盘图标
+    if (!QSystemTrayIcon::isSystemTrayAvailable()) {
+        QMessageBox::critical(this, "系统托盘", "系统不支持托盘图标功能。");
+        return;
+    }
+    
+    // 创建托盘图标
+    m_trayIcon = new QSystemTrayIcon(this);
+    m_trayIcon->setIcon(QIcon("icons/app.ico"));
+    m_trayIcon->setToolTip("Todo List - 待办事项管理");
+    
+    // 创建托盘菜单
+    m_trayMenu = new QMenu(this);
+    
+    // 创建菜单项
+    m_showAction = new QAction("显示主窗口", this);
+    m_showAction->setIcon(QIcon("icons/app.ico"));
+    
+    m_exitAction = new QAction("退出", this);
+    m_exitAction->setIcon(style()->standardIcon(QStyle::SP_DialogCloseButton));
+    
+    // 添加菜单项到托盘菜单
+    m_trayMenu->addAction(m_showAction);
+    m_trayMenu->addSeparator();
+    m_trayMenu->addAction(m_exitAction);
+    
+    // 设置托盘菜单
+    m_trayIcon->setContextMenu(m_trayMenu);
+    
+    // 连接信号和槽
+    connect(m_trayIcon, &QSystemTrayIcon::activated, this, &MainWindow::onTrayIconActivated);
+    connect(m_showAction, &QAction::triggered, this, &MainWindow::onShowFromTray);
+    connect(m_exitAction, &QAction::triggered, this, &MainWindow::onExitFromTray);
+    
+    // 显示托盘图标
+    m_trayIcon->show();
+}
+
+void MainWindow::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason)
+{
+    switch (reason) {
+    case QSystemTrayIcon::DoubleClick:
+        onShowFromTray();
+        break;
+    case QSystemTrayIcon::Trigger:
+        // 单击时显示提示信息
+        m_trayIcon->showMessage("Todo List", "应用程序正在后台运行，双击图标显示主窗口", QSystemTrayIcon::Information, 3000);
+        break;
+    default:
+        break;
+    }
+}
+
+void MainWindow::onShowFromTray()
+{
+    show();
+    raise();
+    activateWindow();
+    setWindowState(windowState() & ~Qt::WindowMinimized);
+}
+
+void MainWindow::onExitFromTray()
+{
+    // 真正退出应用程序
+    QApplication::quit();
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    if (m_trayIcon && m_trayIcon->isVisible()) {
+        // 最小化到托盘而不是退出
+        hide();
+        m_trayIcon->showMessage("Todo List", "应用程序已最小化到系统托盘", QSystemTrayIcon::Information, 2000);
+        event->ignore();
+    } else {
+        event->accept();
     }
 }

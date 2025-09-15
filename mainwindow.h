@@ -10,6 +10,10 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QSystemTrayIcon>
+#include <QMenu>
+#include <QAction>
+#include <QCloseEvent>
 #include "todoitem.h"
 #include "todofolder.h"
 #include "desktopwidget.h"
@@ -59,6 +63,11 @@ private slots:
     void onCalendarTodoToggled(const QString &itemId, bool completed);
     void onCalendarTodoDeleted(const QString &itemId);
     void onCalendarTodoUpdated(const QString &itemId, const TodoItem &item);
+    
+    // 系统托盘相关槽函数
+    void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
+    void onShowFromTray();
+    void onExitFromTray();
 
 private:
     Ui::MainWindow *ui;
@@ -73,6 +82,12 @@ private:
     
     // 日历视图
     CalendarWidget* m_calendarWidget;
+    
+    // 系统托盘
+    QSystemTrayIcon* m_trayIcon;
+    QMenu* m_trayMenu;
+    QAction* m_showAction;
+    QAction* m_exitAction;
     
     // 界面更新方法
     void updateFolderList();
@@ -92,5 +107,9 @@ private:
     void initializeData();
     void setupDesktopWidget();
     void setupCalendarWidget();
+    void setupSystemTray();
+    
+    // 重写事件处理
+    void closeEvent(QCloseEvent *event) override;
 };
 #endif // MAINWINDOW_H

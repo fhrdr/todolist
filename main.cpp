@@ -4,6 +4,7 @@
 #include <QFile>
 #include <QTextStream>
 #include <QDir>
+#include <QIcon>
 
 int main(int argc, char *argv[])
 {
@@ -13,6 +14,9 @@ int main(int argc, char *argv[])
     a.setApplicationName("Todo List");
     a.setApplicationVersion("1.0");
     a.setOrganizationName("TodoApp");
+    
+    // 设置应用程序图标
+    a.setWindowIcon(QIcon("icons/app.ico"));
     
     // 加载样式表
     QFile styleFile(":/styles.qss");
