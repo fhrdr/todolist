@@ -7,6 +7,7 @@ TodoItem::TodoItem()
     , m_createdTime(QDateTime::currentDateTime())
     , m_isCompleted(false)
     , m_folderId("")
+    , m_plannedDate(QDate::currentDate())
 {
 }
 
@@ -17,6 +18,7 @@ TodoItem::TodoItem(const QString &title, const QString &details)
     , m_createdTime(QDateTime::currentDateTime())
     , m_isCompleted(false)
     , m_folderId("")
+    , m_plannedDate(QDate::currentDate())
 {
 }
 
@@ -45,6 +47,7 @@ QJsonObject TodoItem::toJson() const
     json["completedTime"] = m_completedTime.toString(Qt::ISODate);
     json["isCompleted"] = m_isCompleted;
     json["folderId"] = m_folderId;
+    json["plannedDate"] = m_plannedDate.toString(Qt::ISODate);
     return json;
 }
 
@@ -57,6 +60,7 @@ void TodoItem::fromJson(const QJsonObject &json)
     m_completedTime = QDateTime::fromString(json["completedTime"].toString(), Qt::ISODate);
     m_isCompleted = json["isCompleted"].toBool();
     m_folderId = json["folderId"].toString();
+    m_plannedDate = QDate::fromString(json["plannedDate"].toString(), Qt::ISODate);
     
     // 如果ID为空，生成新的ID
     if (m_id.isEmpty()) {
@@ -66,5 +70,10 @@ void TodoItem::fromJson(const QJsonObject &json)
     // 如果创建时间为空，设置为当前时间
     if (!m_createdTime.isValid()) {
         m_createdTime = QDateTime::currentDateTime();
+    }
+    
+    // 如果计划日期无效，设置为当前日期
+    if (!m_plannedDate.isValid()) {
+        m_plannedDate = QDate::currentDate();
     }
 }

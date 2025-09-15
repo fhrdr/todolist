@@ -14,8 +14,9 @@ CalendarWidget::CalendarWidget(QWidget *parent)
     setupConnections();
     applyStyles();
     
-    // 设置当前日期
+    // 设置当前日期并高亮今天
     m_calendar->setSelectedDate(m_currentDate);
+    highlightToday();
     onDateChanged(m_currentDate);
 }
 
@@ -37,8 +38,18 @@ void CalendarWidget::setupUI()
     m_calendar->setMinimumSize(350, 250);
     m_calendar->setMaximumSize(400, 300);
     
-    // 右侧分割器
-    m_splitter = new QSplitter(Qt::Horizontal);
+    // 隐藏周数列（最左侧一列）
+    m_calendar->setVerticalHeaderFormat(QCalendarWidget::NoVerticalHeader);
+    
+    // 设置导航栏格式，去掉月份下面的下标
+    m_calendar->setHorizontalHeaderFormat(QCalendarWidget::ShortDayNames);
+    m_calendar->setNavigationBarVisible(true);
+    
+    // 设置今天为默认选中日期并高亮显示
+    m_calendar->setSelectedDate(QDate::currentDate());
+    
+    // 美化日历样式
+    m_calendar->setGridVisible(true);
     
     // 待办事项区域
     m_todoWidget = new QWidget();
@@ -75,46 +86,49 @@ void CalendarWidget::setupUI()
     
     // 操作按钮布局
     m_buttonLayout = new QHBoxLayout();
-    m_deleteButton = new QPushButton("删除");
-    m_completeButton = new QPushButton("完成");
-    m_incompleteButton = new QPushButton("未完成");
+    m_buttonLayout->setSpacing(8);
+    
+    m_deleteButton = new QPushButton("🗑️ 删除");
+    m_refreshButton = new QPushButton("🔄 刷新");
+    
+    // 设置按钮样式
+    QString buttonStyle = 
+        "QPushButton {"
+        "    padding: 6px 12px;"
+        "    border: 1px solid #ddd;"
+        "    border-radius: 6px;"
+        "    background-color: #f8f9fa;"
+        "    font-size: 11px;"
+        "    font-weight: 500;"
+        "    min-width: 60px;"
+        "}"
+        "QPushButton:hover {"
+        "    background-color: #e9ecef;"
+        "    border-color: #adb5bd;"
+        "}"
+        "QPushButton:pressed {"
+        "    background-color: #dee2e6;"
+        "}"
+        "QPushButton:disabled {"
+        "    background-color: #f8f9fa;"
+        "    color: #6c757d;"
+        "    border-color: #dee2e6;"
+        "}";
+    
+    m_deleteButton->setStyleSheet(buttonStyle + 
+        "QPushButton:hover { background-color: #f8d7da; border-color: #f5c6cb; }");
+    m_refreshButton->setStyleSheet(buttonStyle + 
+        "QPushButton:hover { background-color: #cce5ff; border-color: #99d6ff; }");
     
     m_deleteButton->setEnabled(false);
-    m_completeButton->setEnabled(false);
-    m_incompleteButton->setEnabled(false);
     
     m_buttonLayout->addWidget(m_deleteButton);
-    m_buttonLayout->addWidget(m_completeButton);
-    m_buttonLayout->addWidget(m_incompleteButton);
+    m_buttonLayout->addWidget(m_refreshButton);
     m_todoLayout->addLayout(m_buttonLayout);
-    
-    // 详情面板
-    m_detailWidget = new QWidget();
-    m_detailLayout = new QVBoxLayout(m_detailWidget);
-    m_detailLayout->setContentsMargins(5, 5, 5, 5);
-    
-    m_detailTitleLabel = new QLabel("待办事项详情");
-    m_detailTitleLabel->setStyleSheet("font-size: 14px; font-weight: bold; color: #333; padding: 5px;");
-    m_detailLayout->addWidget(m_detailTitleLabel);
-    
-    m_detailTextEdit = new QTextEdit();
-    m_detailTextEdit->setMaximumHeight(150);
-    m_detailTextEdit->setPlaceholderText("选择一个待办事项查看详情...");
-    m_detailLayout->addWidget(m_detailTextEdit);
-    
-    m_saveDetailButton = new QPushButton("保存详情");
-    m_saveDetailButton->setEnabled(false);
-    m_detailLayout->addWidget(m_saveDetailButton);
-    
-    // 添加到分割器
-    m_splitter->addWidget(m_todoWidget);
-    m_splitter->addWidget(m_detailWidget);
-    m_splitter->setStretchFactor(0, 2);
-    m_splitter->setStretchFactor(1, 1);
     
     // 添加到主布局
     m_topLayout->addWidget(m_calendar);
-    m_topLayout->addWidget(m_splitter, 1);
+    m_topLayout->addWidget(m_todoWidget, 1);
     
     m_mainLayout->addLayout(m_topLayout);
 }
@@ -127,9 +141,7 @@ void CalendarWidget::setupConnections()
     connect(m_todoListWidget, &QListWidget::itemClicked, this, &CalendarWidget::onTodoItemClicked);
     connect(m_todoListWidget, &QListWidget::itemChanged, this, &CalendarWidget::onTodoItemChanged);
     connect(m_deleteButton, &QPushButton::clicked, this, &CalendarWidget::onDeleteSelectedTodo);
-    connect(m_completeButton, &QPushButton::clicked, this, &CalendarWidget::onMarkTodoCompleted);
-    connect(m_incompleteButton, &QPushButton::clicked, this, &CalendarWidget::onMarkTodoIncomplete);
-    connect(m_saveDetailButton, &QPushButton::clicked, this, &CalendarWidget::updateTodoDetails);
+    connect(m_refreshButton, &QPushButton::clicked, this, &CalendarWidget::onRefreshClicked);
 }
 
 void CalendarWidget::applyStyles()
@@ -141,7 +153,32 @@ void CalendarWidget::applyStyles()
         "QCalendarWidget {"
         "    background-color: white;"
         "    border: 1px solid #ddd;"
-        "    border-radius: 5px;"
+        "    border-radius: 8px;"
+        "    font-family: 'Microsoft YaHei', Arial, sans-serif;"
+        "}"
+        "QCalendarWidget QWidget#qt_calendar_navigationbar {"
+        "    background-color: #4a90e2;"
+        "    border-top-left-radius: 8px;"
+        "    border-top-right-radius: 8px;"
+        "}"
+        "QCalendarWidget QTableView {"
+        "    outline: 0px;"
+        "    gridline-color: #e0e0e0;"
+        "    background-color: white;"
+        "    selection-background-color: #4a90e2;"
+        "    selection-color: white;"
+        "}"
+        "QCalendarWidget QTableView::item {"
+        "    padding: 8px;"
+        "    border: none;"
+        "}"
+        "QCalendarWidget QTableView::item:hover {"
+        "    background-color: #e3f2fd;"
+        "}"
+        "QCalendarWidget QTableView::item:selected {"
+        "    background-color: #4a90e2;"
+        "    color: white;"
+        "    font-weight: bold;"
         "}"
         "QCalendarWidget QToolButton {"
         "    height: 30px;"
@@ -238,7 +275,7 @@ void CalendarWidget::refreshCalendarData()
     for (const TodoFolder &folder : m_folders) {
         QList<TodoItem> items = folder.getItems();
         for (const TodoItem &item : items) {
-            QDate itemDate = item.getCreatedTime().date();
+            QDate itemDate = item.getPlannedDate(); // 使用计划日期而不是创建时间
             
             if (!m_dateToTodos.contains(itemDate)) {
                 m_dateToTodos[itemDate] = QList<TodoItem>();
@@ -325,28 +362,21 @@ void CalendarWidget::onTodoItemClicked(QListWidgetItem *item)
     
     QString itemId = item->data(Qt::UserRole).toString();
     
-    // 查找对应的TodoItem
+    // 查找对应的TodoItem并创建副本
     m_currentItem = nullptr;
     QList<TodoItem> todos = getTodosForDate(m_currentDate);
     for (const TodoItem &todo : todos) {
         if (todo.getId() == itemId) {
-            // 创建一个副本用于编辑
-            static TodoItem editItem = todo;
-            m_currentItem = &editItem;
+            // 创建一个成员变量副本用于编辑
+            m_editItem = todo;
+            m_currentItem = &m_editItem;
             break;
         }
     }
     
     if (m_currentItem) {
-        // 更新详情面板
-        m_detailTitleLabel->setText(QString("详情: %1").arg(m_currentItem->getTitle()));
-        m_detailTextEdit->setPlainText(m_currentItem->getDetails());
-        m_saveDetailButton->setEnabled(true);
-        
         // 更新按钮状态
         m_deleteButton->setEnabled(true);
-        m_completeButton->setEnabled(!m_currentItem->isCompleted());
-        m_incompleteButton->setEnabled(m_currentItem->isCompleted());
     }
 }
 
@@ -374,40 +404,24 @@ void CalendarWidget::onDeleteSelectedTodo()
     }
 }
 
-void CalendarWidget::onMarkTodoCompleted()
+// onMarkTodoCompleted 和 onMarkTodoIncomplete 方法已移除
+
+void CalendarWidget::onRefreshClicked()
 {
-    if (!m_currentItem) return;
-    
-    emit todoItemToggled(m_currentItem->getId(), true);
+    // 刷新日历数据和待办事项列表
+    refreshCalendarData();
+    updateDateTodoList();
+    highlightDatesWithTodos();
+    clearTodoDetails();
 }
 
-void CalendarWidget::onMarkTodoIncomplete()
-{
-    if (!m_currentItem) return;
-    
-    emit todoItemToggled(m_currentItem->getId(), false);
-}
-
-void CalendarWidget::updateTodoDetails()
-{
-    if (!m_currentItem) return;
-    
-    QString newDetails = m_detailTextEdit->toPlainText();
-    m_currentItem->setDetails(newDetails);
-    
-    emit todoItemUpdated(m_currentItem->getId(), *m_currentItem);
-}
+// updateTodoDetails方法已移除，不再支持详情编辑
 
 void CalendarWidget::clearTodoDetails()
 {
     m_currentItem = nullptr;
-    m_detailTitleLabel->setText("待办事项详情");
-    m_detailTextEdit->clear();
-    m_saveDetailButton->setEnabled(false);
     
     m_deleteButton->setEnabled(false);
-    m_completeButton->setEnabled(false);
-    m_incompleteButton->setEnabled(false);
 }
 
 void CalendarWidget::updateCalendarHighlights()
@@ -417,9 +431,7 @@ void CalendarWidget::updateCalendarHighlights()
 
 void CalendarWidget::highlightDatesWithTodos()
 {
-    // 清除之前的格式
-    QTextCharFormat defaultFormat;
-    defaultFormat.setBackground(QBrush(Qt::white));
+    QDate today = QDate::currentDate();
     
     // 为有待办事项的日期设置高亮
     for (auto it = m_dateToTodos.begin(); it != m_dateToTodos.end(); ++it) {
@@ -429,6 +441,13 @@ void CalendarWidget::highlightDatesWithTodos()
         
         if (totalCount > 0) {
             QTextCharFormat format;
+            
+            // 如果是今天，保持今天的特殊样式
+            if (date == today) {
+                format.setForeground(QBrush(QColor(26, 115, 232)));
+                format.setFontWeight(QFont::Bold);
+                format.setProperty(QTextFormat::OutlinePen, QPen(QColor(26, 115, 232), 2));
+            }
             
             if (completedCount == totalCount) {
                 // 全部完成 - 绿色背景
@@ -444,4 +463,23 @@ void CalendarWidget::highlightDatesWithTodos()
             m_calendar->setDateTextFormat(date, format);
         }
     }
+    
+    // 确保今天始终有特殊标识
+    highlightToday();
+}
+
+void CalendarWidget::highlightToday()
+{
+    QDate today = QDate::currentDate();
+    QTextCharFormat todayFormat;
+    
+    // 设置今天的特殊样式 - 蓝色边框和粗体
+    todayFormat.setForeground(QBrush(QColor(26, 115, 232))); // 蓝色文字
+    todayFormat.setFontWeight(QFont::Bold);
+    todayFormat.setProperty(QTextFormat::OutlinePen, QPen(QColor(26, 115, 232), 2));
+    
+    // 设置今日的灰色背景
+    todayFormat.setBackground(QBrush(QColor(220, 220, 220))); // 灰色背景
+    
+    m_calendar->setDateTextFormat(today, todayFormat);
 }

@@ -18,6 +18,7 @@ MainWindow::MainWindow(QWidget *parent)
     setupConnections();
     setupDesktopWidget();
     setupCalendarWidget();
+    updateCalendarWidget();
 }
 
 MainWindow::~MainWindow()
@@ -148,6 +149,7 @@ void MainWindow::onNewTodoClicked()
     
     if (ok && !title.isEmpty()) {
         TodoItem newItem(title);
+        newItem.setPlannedDate(QDate::currentDate()); // 设置计划日期为今日
         m_currentFolder->addItem(newItem);
         updateTodoList();
         updateFolderList();
@@ -392,6 +394,7 @@ void MainWindow::onDesktopNewTodo(const QString &title)
     
     if (targetFolder) {
         TodoItem newItem(title);
+        newItem.setPlannedDate(QDate::currentDate()); // 设置计划日期为今日
         targetFolder->addItem(newItem);
         
         // 更新界面
@@ -442,6 +445,8 @@ void MainWindow::setupCalendarWidget()
     // 连接日历组件的信号
     connect(m_calendarWidget, &CalendarWidget::todoItemAdded, this, &MainWindow::onCalendarTodoAdded);
     connect(m_calendarWidget, &CalendarWidget::todoItemToggled, this, &MainWindow::onCalendarTodoToggled);
+    connect(m_calendarWidget, &CalendarWidget::todoItemDeleted, this, &MainWindow::onCalendarTodoDeleted);
+    connect(m_calendarWidget, &CalendarWidget::todoItemUpdated, this, &MainWindow::onCalendarTodoUpdated);
 }
 
 void MainWindow::updateCalendarWidget()
@@ -455,24 +460,32 @@ void MainWindow::updateCalendarWidget()
 
 void MainWindow::onCalendarTodoAdded(const QString& title, const QDate& date)
 {
-    Q_UNUSED(date)  // 暂时不使用日期参数
     // 从日历视图添加新的待办事项
     TodoItem todoItem(title);
+    todoItem.setPlannedDate(date); // 设置计划日期为选中的日期
     
-    // 如果当前有选中的文件夹，将待办事项添加到该文件夹
-    int currentFolderIndex = ui->folderListWidget->currentRow();
-    if (currentFolderIndex >= 0 && currentFolderIndex < m_folders.size()) {
-        todoItem.setFolderId(m_folders[currentFolderIndex].getId());
-        m_folders[currentFolderIndex].addItem(todoItem);
-    } else {
-        // 如果没有选中文件夹，添加到第一个文件夹或创建默认文件夹
-        if (m_folders.isEmpty()) {
-            TodoFolder defaultFolder("默认");
-            m_folders.append(defaultFolder);
+    // 创建指定日期文件夹名称（格式：YYYY-MM-DD）
+    QString dateFolderName = date.toString("yyyy-MM-dd");
+    
+    // 查找是否已存在该日期文件夹
+    TodoFolder* dateFolder = nullptr;
+    for (TodoFolder& folder : m_folders) {
+        if (folder.getName() == dateFolderName) {
+            dateFolder = &folder;
+            break;
         }
-        todoItem.setFolderId(m_folders[0].getId());
-        m_folders[0].addItem(todoItem);
     }
+    
+    // 如果不存在该日期文件夹，创建一个
+    if (!dateFolder) {
+        TodoFolder newDateFolder(dateFolderName);
+        m_folders.append(newDateFolder);
+        dateFolder = &m_folders.last();
+    }
+    
+    // 将待办事项添加到指定日期文件夹
+    todoItem.setFolderId(dateFolder->getId());
+    dateFolder->addItem(todoItem);
     
     // 保存数据并更新界面
     saveData();

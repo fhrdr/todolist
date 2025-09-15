@@ -37,8 +37,7 @@ public slots:
     void onTodoItemClicked(QListWidgetItem *item);
     void onTodoItemChanged(QListWidgetItem *item);
     void onDeleteSelectedTodo();
-    void onMarkTodoCompleted();
-    void onMarkTodoIncomplete();
+    void onRefreshClicked();
     
 signals:
     void todoItemAdded(const QString &title, const QDate &date);
@@ -48,7 +47,6 @@ signals:
     
 private slots:
     void updateDateTodoList();
-    void updateTodoDetails();
     void clearTodoDetails();
     
 private:
@@ -57,11 +55,11 @@ private:
     void applyStyles();
     void updateCalendarHighlights();
     void highlightDatesWithTodos();
+    void highlightToday();
     
     // UI组件
     QVBoxLayout *m_mainLayout;
     QHBoxLayout *m_topLayout;
-    QSplitter *m_splitter;
     
     // 日历相关
     QCalendarWidget *m_calendar;
@@ -81,20 +79,15 @@ private:
     // 操作按钮
     QHBoxLayout *m_buttonLayout;
     QPushButton *m_deleteButton;
-    QPushButton *m_completeButton;
-    QPushButton *m_incompleteButton;
+    QPushButton *m_refreshButton;
     
-    // 详情面板
-    QWidget *m_detailWidget;
-    QVBoxLayout *m_detailLayout;
-    QLabel *m_detailTitleLabel;
-    QTextEdit *m_detailTextEdit;
-    QPushButton *m_saveDetailButton;
+    // 详情面板已移除
     
     // 数据管理
     QList<TodoFolder> m_folders;
     QDate m_currentDate;
     TodoItem *m_currentItem;
+    TodoItem m_editItem;
     
     // 日期-待办事项映射（用于快速查找和高亮显示）
     QMap<QDate, QList<TodoItem>> m_dateToTodos;

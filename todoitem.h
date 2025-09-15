@@ -3,6 +3,7 @@
 
 #include <QString>
 #include <QDateTime>
+#include <QDate>
 #include <QJsonObject>
 #include <QUuid>
 
@@ -21,12 +22,14 @@ public:
     QDateTime getCompletedTime() const { return m_completedTime; }
     bool isCompleted() const { return m_isCompleted; }
     QString getFolderId() const { return m_folderId; }
+    QDate getPlannedDate() const { return m_plannedDate; }
     
     // Setters
     void setTitle(const QString &title) { m_title = title; }
     void setDetails(const QString &details) { m_details = details; }
     void setCompleted(bool completed);
     void setFolderId(const QString &folderId) { m_folderId = folderId; }
+    void setPlannedDate(const QDate &date) { m_plannedDate = date; }
     
     // JSON serialization
     QJsonObject toJson() const;
@@ -40,6 +43,7 @@ private:
     QDateTime m_completedTime; // 完成时间
     bool m_isCompleted;        // 是否完成
     QString m_folderId;        // 所属文件夹ID
+    QDate m_plannedDate;       // 计划日期
 };
 
 #endif // TODOITEM_H
