@@ -80,38 +80,9 @@ void DesktopWidget::setupUI()
 
 void DesktopWidget::setupTrayIcon()
 {
-    if (!QSystemTrayIcon::isSystemTrayAvailable()) {
-        return;
-    }
-    
-    m_trayIcon = new QSystemTrayIcon(this);
-    // 使用系统标准图标，避免资源文件依赖
-    QIcon trayIcon = style()->standardIcon(QStyle::SP_ComputerIcon);
-    if (trayIcon.isNull()) {
-        // 如果标准图标不可用，创建一个简单的图标
-        QPixmap pixmap(16, 16);
-        pixmap.fill(Qt::blue);
-        trayIcon = QIcon(pixmap);
-    }
-    m_trayIcon->setIcon(trayIcon);
-    m_trayIcon->setToolTip("Todo List - 待办事项");
-    
-    // 创建托盘菜单
-    m_trayMenu = new QMenu(this);
-    m_showAction = m_trayMenu->addAction("显示小贴士");
-    m_trayMenu->addSeparator();
-    QAction *showMainAction = m_trayMenu->addAction("打开主窗口");
-    m_exitAction = m_trayMenu->addAction("退出");
-    
-    m_trayIcon->setContextMenu(m_trayMenu);
-    
-    // 连接信号
-    connect(m_showAction, &QAction::triggered, this, &DesktopWidget::show);
-    connect(showMainAction, &QAction::triggered, this, &DesktopWidget::onShowMainWindow);
-    connect(m_exitAction, &QAction::triggered, this, &DesktopWidget::onExitApplication);
-    connect(m_trayIcon, &QSystemTrayIcon::activated, this, &DesktopWidget::onTrayIconActivated);
-    
-    m_trayIcon->show();
+    // 不创建独立的托盘图标，使用主窗口的托盘图标
+    // DesktopWidget 不应该有自己的托盘图标
+    return;
 }
 
 void DesktopWidget::setupConnections()

@@ -16,6 +16,18 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     
+    // 设置窗口图标
+    QIcon windowIcon(":/icons/app.ico");
+    if (windowIcon.isNull()) {
+        // 如果资源图标加载失败，尝试文件路径
+        QString iconPath = QDir::currentPath() + "/icons/app.ico";
+        windowIcon = QIcon(iconPath);
+        if (windowIcon.isNull()) {
+            windowIcon = QIcon("icons/app.ico");
+        }
+    }
+    setWindowIcon(windowIcon);
+    
     initializeData();
     loadData();
     updateFolderList();
@@ -731,7 +743,21 @@ void MainWindow::setupSystemTray()
     
     // 创建托盘图标
     m_trayIcon = new QSystemTrayIcon(this);
-    m_trayIcon->setIcon(QIcon("icons/app.ico"));
+    QIcon trayIcon(":/icons/app.ico");
+    if (trayIcon.isNull()) {
+        // 如果资源图标加载失败，尝试文件路径
+        QString iconPath = QDir::currentPath() + "/icons/app.ico";
+        trayIcon = QIcon(iconPath);
+        if (trayIcon.isNull()) {
+            // 如果文件路径也失败，尝试相对路径
+            trayIcon = QIcon("icons/app.ico");
+            if (trayIcon.isNull()) {
+                // 如果还是失败，使用默认图标
+                trayIcon = style()->standardIcon(QStyle::SP_ComputerIcon);
+            }
+        }
+    }
+    m_trayIcon->setIcon(trayIcon);
     m_trayIcon->setToolTip("Todo List - 待办事项管理");
     
     // 创建托盘菜单
@@ -739,7 +765,7 @@ void MainWindow::setupSystemTray()
     
     // 创建菜单项
     m_showAction = new QAction("显示主窗口", this);
-    m_showAction->setIcon(QIcon("icons/app.ico"));
+    m_showAction->setIcon(trayIcon);  // 使用相同的图标
     
     m_exitAction = new QAction("退出", this);
     m_exitAction->setIcon(style()->standardIcon(QStyle::SP_DialogCloseButton));
