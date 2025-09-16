@@ -10,6 +10,9 @@ CalendarWidget::CalendarWidget(QWidget *parent)
     , m_currentDate(QDate::currentDate())
     , m_currentItem(nullptr)
 {
+    // 初始化m_folders为空列表
+    m_folders.clear();
+    
     setupUI();
     setupConnections();
     applyStyles();
@@ -259,6 +262,12 @@ void CalendarWidget::applyStyles()
 
 void CalendarWidget::updateTodoData(const QList<TodoFolder> &folders)
 {
+    // 安全检查：确保传入的数据有效
+    if (&folders == &m_folders) {
+        // 如果传入的是同一个对象的引用，直接返回避免自赋值
+        return;
+    }
+    
     m_folders = folders;
     refreshCalendarData();
     updateDateTodoList();

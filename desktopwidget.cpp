@@ -16,12 +16,15 @@ DesktopWidget::DesktopWidget(QWidget *parent)
     , m_trayIcon(nullptr)
     , m_dragging(false)
 {
+    // 初始化m_folders为空列表
+    m_folders.clear();
+    
     setupUI();
     setupTrayIcon();
     
     // 创建刷新定时器（必须在setupConnections之前）
     m_refreshTimer = new QTimer(this);
-    m_refreshTimer->setInterval(30000); // 30秒刷新一次
+    m_refreshTimer->setInterval(60000); // 每分钟刷新一次
     
     setupConnections();
     
@@ -37,6 +40,9 @@ DesktopWidget::DesktopWidget(QWidget *parent)
     m_refreshTimer->start();
     
     applyStyles();
+    
+    // 初始加载
+    loadPendingItems();
 }
 
 DesktopWidget::~DesktopWidget()
@@ -142,6 +148,12 @@ void DesktopWidget::applyStyles()
 
 void DesktopWidget::updateTodoData(const QList<TodoFolder> &folders)
 {
+    // 安全检查：确保传入的数据有效
+    if (&folders == &m_folders) {
+        // 如果传入的是同一个对象的引用，直接返回避免自赋值
+        return;
+    }
+    
     m_folders = folders;
     loadPendingItems();
     updateTodoList();

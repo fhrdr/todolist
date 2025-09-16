@@ -397,7 +397,10 @@ void MainWindow::setupDesktopWidget()
 void MainWindow::updateDesktopWidget()
 {
     if (m_desktopWidget) {
-        m_desktopWidget->updateTodoData(m_folders);
+        // 确保m_folders不为空且有效
+        if (!m_folders.isEmpty()) {
+            m_desktopWidget->updateTodoData(m_folders);
+        }
     }
 }
 
@@ -469,7 +472,10 @@ void MainWindow::setupCalendarWidget()
 void MainWindow::updateCalendarWidget()
 {
     if (m_calendarWidget) {
-        m_calendarWidget->updateTodoData(m_folders);
+        // 确保m_folders不为空且有效
+        if (!m_folders.isEmpty()) {
+            m_calendarWidget->updateTodoData(m_folders);
+        }
     }
 }
 
@@ -649,17 +655,37 @@ void MainWindow::loadData()
     
     if (file.open(QIODevice::ReadOnly)) {
         QByteArray data = file.readAll();
-        QJsonDocument doc = QJsonDocument::fromJson(data);
-        QJsonObject rootObj = doc.object();
+        file.close(); // 确保文件被正确关闭
         
-        m_folders.clear();
-        QJsonArray foldersArray = rootObj["folders"].toArray();
-        for (const QJsonValue &value : foldersArray) {
-            TodoFolder folder(value.toObject());
-            m_folders.append(folder);
+        // 检查数据是否为空
+        if (data.isEmpty()) {
+            qDebug() << "Warning: todolist.json is empty";
+            return;
         }
         
-        updateCalendarWidget();
+        QJsonParseError parseError;
+        QJsonDocument doc = QJsonDocument::fromJson(data, &parseError);
+        
+        // 检查JSON解析是否成功
+        if (parseError.error != QJsonParseError::NoError) {
+            qDebug() << "JSON parse error:" << parseError.errorString();
+            return;
+        }
+        
+        QJsonObject rootObj = doc.object();
+        
+        // 安全地清空现有数据
+        m_folders.clear();
+        
+        QJsonArray foldersArray = rootObj["folders"].toArray();
+        for (const QJsonValue &value : foldersArray) {
+            if (value.isObject()) {
+                TodoFolder folder(value.toObject());
+                m_folders.append(folder);
+            }
+        }
+        
+        // 注意：不在这里调用updateCalendarWidget，因为此时CalendarWidget可能还未创建
     }
 }
 
@@ -684,7 +710,17 @@ void MainWindow::saveData()
     
     QFile file(filePath);
     if (file.open(QIODevice::WriteOnly)) {
-        file.write(doc.toJson());
+        qint64 bytesWritten = file.write(doc.toJson());
+        file.flush(); // 确保数据被写入磁盘
+        file.close(); // 确保文件被正确关闭
+        
+        if (bytesWritten == -1) {
+            qDebug() << "Error: Failed to write data to file";
+        } else {
+            qDebug() << "Data saved successfully, bytes written:" << bytesWritten;
+        }
+    } else {
+        qDebug() << "Error: Cannot open file for writing:" << file.errorString();
     }
 }
 
@@ -812,7 +848,8 @@ void MainWindow::onShowFromTray()
 
 void MainWindow::onExitFromTray()
 {
-    // 真正退出应用程序
+    // 保存数据后真正退出应用程序
+    saveData();
     QApplication::quit();
 }
 
