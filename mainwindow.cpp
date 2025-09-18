@@ -648,7 +648,8 @@ void MainWindow::loadData()
     // QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     // QDir().mkpath(dataPath);
     // QString filePath = dataPath + "/todolist.json";
-    QString filePath = "todolist.json";
+    // QString filePath = "todolist.json";
+    QString filePath = "./todolist_json/todolist.json";
     
     QFile file(filePath);
     if (!file.exists()) return;
@@ -694,10 +695,16 @@ void MainWindow::saveData()
     // QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     // QDir().mkpath(dataPath);
     // QString filePath = dataPath + "/todolist.json";
-    QString filePath = "todolist.json";
+    QString filePath = "./todolist_json/todolist.json";
     
     QJsonObject rootObj;
     QJsonArray foldersArray;
+
+    // 如果filePath不存在，创建目录
+    QFileInfo fileInfo(filePath);
+    if (!fileInfo.dir().exists()) {
+        QDir().mkpath(fileInfo.dir().absolutePath());
+    }
     
     for (const TodoFolder &folder : m_folders) {
         foldersArray.append(folder.toJson());
