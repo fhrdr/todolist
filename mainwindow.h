@@ -38,6 +38,7 @@ private slots:
     void onNewFolderClicked();
     void onFolderSelectionChanged();
     void onDeleteFolderClicked();
+    void onFolderDoubleClicked(QListWidgetItem* item);
     
     // 待办事项相关槽函数
     void onNewTodoClicked();
@@ -101,6 +102,7 @@ private:
     void loadData();
     void saveData();
     TodoFolder* findFolderById(const QString &folderId);
+    TodoFolder* findOrCreateTodayFolder();
     
     // 初始化方法
     void setupConnections();

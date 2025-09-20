@@ -54,6 +54,7 @@ void MainWindow::setupConnections()
     connect(ui->newFolderBtn, &QPushButton::clicked, this, &MainWindow::onNewFolderClicked);
     connect(ui->deleteFolderBtn, &QPushButton::clicked, this, &MainWindow::onDeleteFolderClicked);
     connect(ui->folderListWidget, &QListWidget::currentRowChanged, this, &MainWindow::onFolderSelectionChanged);
+    connect(ui->folderListWidget, &QListWidget::itemDoubleClicked, this, &MainWindow::onFolderDoubleClicked);
     
     // 待办事项相关连接
     connect(ui->newTodoBtn, &QPushButton::clicked, this, &MainWindow::onNewTodoClicked);
@@ -102,9 +103,10 @@ void MainWindow::onNewFolderClicked()
 
 void MainWindow::onFolderSelectionChanged()
 {
-    int currentRow = ui->folderListWidget->currentRow();
-    if (currentRow >= 0 && currentRow < m_folders.size()) {
-        m_currentFolder = &m_folders[currentRow];
+    QListWidgetItem *currentItem = ui->folderListWidget->currentItem();
+    if (currentItem) {
+        QString folderId = currentItem->data(Qt::UserRole).toString();
+        m_currentFolder = findFolderById(folderId);
         m_currentItem = nullptr;
         updateTodoList();
         clearDetailPanel();
@@ -112,6 +114,7 @@ void MainWindow::onFolderSelectionChanged()
         // 启用删除按钮
         ui->deleteFolderBtn->setEnabled(true);
     } else {
+        m_currentFolder = nullptr;
         // 禁用删除按钮
         ui->deleteFolderBtn->setEnabled(false);
     }
@@ -119,9 +122,9 @@ void MainWindow::onFolderSelectionChanged()
 
 void MainWindow::onDeleteFolderClicked()
 {
-    int currentRow = ui->folderListWidget->currentRow();
-    if (currentRow >= 0 && currentRow < m_folders.size()) {
-        QString folderName = m_folders[currentRow].getName();
+    QListWidgetItem *currentItem = ui->folderListWidget->currentItem();
+    if (currentItem && m_currentFolder) {
+        QString folderName = m_currentFolder->getName();
         
         // 确认删除
         int ret = QMessageBox::question(this, "删除文件夹", 
@@ -129,8 +132,14 @@ void MainWindow::onDeleteFolderClicked()
                                       QMessageBox::Yes | QMessageBox::No);
         
         if (ret == QMessageBox::Yes) {
-            // 删除文件夹
-            m_folders.removeAt(currentRow);
+            // 根据文件夹ID删除文件夹
+            QString folderId = m_currentFolder->getId();
+            for (int i = 0; i < m_folders.size(); ++i) {
+                if (m_folders[i].getId() == folderId) {
+                    m_folders.removeAt(i);
+                    break;
+                }
+            }
             
             // 重置当前选择
             m_currentFolder = nullptr;
@@ -149,6 +158,44 @@ void MainWindow::onDeleteFolderClicked()
             // 如果没有文件夹了，禁用删除按钮
             if (m_folders.isEmpty()) {
                 ui->deleteFolderBtn->setEnabled(false);
+            }
+        }
+    }
+}
+
+void MainWindow::onFolderDoubleClicked(QListWidgetItem* item)
+{
+    if (!item) return;
+    
+    // 获取文件夹ID
+    QString folderId = item->data(Qt::UserRole).toString();
+    TodoFolder* folder = findFolderById(folderId);
+    
+    if (!folder) return;
+    
+    // 弹出输入对话框让用户修改文件夹名称
+    bool ok;
+    QString newName = QInputDialog::getText(this, "重命名文件夹", 
+                                          "请输入新的文件夹名称:", 
+                                          QLineEdit::Normal, 
+                                          folder->getName(), &ok);
+    
+    if (ok && !newName.isEmpty() && newName != folder->getName()) {
+        // 更新文件夹名称
+        folder->setName(newName);
+        
+        // 更新界面显示
+        updateFolderList();
+        
+        // 保存数据
+        saveData();
+        
+        // 重新选中该文件夹
+        for (int i = 0; i < ui->folderListWidget->count(); ++i) {
+            QListWidgetItem* listItem = ui->folderListWidget->item(i);
+            if (listItem && listItem->data(Qt::UserRole).toString() == folderId) {
+                ui->folderListWidget->setCurrentItem(listItem);
+                break;
             }
         }
     }
@@ -406,16 +453,13 @@ void MainWindow::updateDesktopWidget()
 
 void MainWindow::onDesktopNewTodo(const QString &title)
 {
-    // 添加到当前选中的文件夹，如果没有选中则添加到第一个文件夹
-    TodoFolder* targetFolder = m_currentFolder;
-    if (!targetFolder && !m_folders.isEmpty()) {
-        targetFolder = &m_folders[0];
-    }
+    // 查找或创建今天的文件夹
+    TodoFolder* todayFolder = findOrCreateTodayFolder();
     
-    if (targetFolder) {
+    if (todayFolder) {
         TodoItem newItem(title);
         newItem.setPlannedDate(QDate::currentDate()); // 设置计划日期为今日
-        targetFolder->addItem(newItem);
+        todayFolder->addItem(newItem);
         
         // 更新界面
         updateTodoList();
@@ -544,12 +588,22 @@ void MainWindow::updateFolderList()
 {
     ui->folderListWidget->clear();
     
-    for (const TodoFolder &folder : m_folders) {
+    // 创建文件夹的副本用于排序，按创建时间倒序排列
+    QList<TodoFolder> sortedFolders = m_folders;
+    std::sort(sortedFolders.begin(), sortedFolders.end(), [](const TodoFolder &a, const TodoFolder &b) {
+        return a.getCreatedTime() > b.getCreatedTime(); // 倒序：新的在前
+    });
+    
+    for (const TodoFolder &folder : sortedFolders) {
         QString displayText = QString("%1 (%2/%3)")
                              .arg(folder.getName())
                              .arg(folder.getCompletedCount())
                              .arg(folder.getItemCount());
-        ui->folderListWidget->addItem(displayText);
+        
+        QListWidgetItem *item = new QListWidgetItem(displayText);
+        // 存储原始文件夹的ID，用于后续操作
+        item->setData(Qt::UserRole, folder.getId());
+        ui->folderListWidget->addItem(item);
     }
 }
 
@@ -739,6 +793,28 @@ TodoFolder* MainWindow::findFolderById(const QString &folderId)
         }
     }
     return nullptr;
+}
+
+TodoFolder* MainWindow::findOrCreateTodayFolder()
+{
+    QString todayString = QDate::currentDate().toString("yyyy-MM-dd");
+    
+    // 首先查找是否已存在今天的文件夹
+    for (TodoFolder &folder : m_folders) {
+        if (folder.getName() == todayString) {
+            return &folder;
+        }
+    }
+    
+    // 如果不存在，创建今天的文件夹
+    TodoFolder todayFolder(todayString);
+    m_folders.append(todayFolder);
+    
+    // 更新文件夹列表显示
+    updateFolderList();
+    
+    // 返回新创建的文件夹
+    return &m_folders.last();
 }
 
 void MainWindow::onCalendarTodoDeleted(const QString &itemId)
