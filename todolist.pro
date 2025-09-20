@@ -29,6 +29,9 @@ FORMS += \
 RESOURCES += \
     resources.qrc
 
+# 设置应用程序图标
+RC_ICONS = icons/app.ico
+
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
