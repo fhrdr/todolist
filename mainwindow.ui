@@ -469,6 +469,37 @@
         </item>
        </layout>
       </widget>
+      <widget class="QWidget" name="tagTab">
+       <attribute name="title">
+        <string>标签视图</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="tagTabLayout">
+        <property name="spacing">
+         <number>0</number>
+        </property>
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+        <item>
+         <widget class="QWidget" name="tagContainer" native="true">
+          <property name="styleSheet">
+           <string notr="true">QWidget#tagContainer {
+    background-color: #f8fafc;
+}</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
      </widget>
     </item>
    </layout>

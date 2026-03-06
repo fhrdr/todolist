@@ -63,6 +63,9 @@ signals:
     void dateClicked(const QDate &date);
     void todoClicked(const QString &todoId);
     
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
+    
 private:
     void setupUI();
     void updateCells();

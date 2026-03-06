@@ -14,10 +14,12 @@
 #include <QMenu>
 #include <QAction>
 #include <QCloseEvent>
+#include <QSqlDatabase>
 #include "todoitem.h"
 #include "todofolder.h"
 #include "desktopwidget.h"
 #include "calendarwidget.h"
+#include "tagwidget.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -34,37 +36,38 @@ public:
     ~MainWindow();
 
 private slots:
-    // 文件夹相关槽函数
     void onNewFolderClicked();
     void onFolderSelectionChanged();
     void onDeleteFolderClicked();
+    void onPinFolderClicked();
     void onFolderDoubleClicked(QListWidgetItem* item);
+    void onFolderContextMenu(const QPoint &pos);
     
-    // 待办事项相关槽函数
     void onNewTodoClicked();
     void onTodoSelectionChanged();
+    void onTodoDoubleClicked(QListWidgetItem* item);
+    void onTodoContextMenu(const QPoint &pos);
     void onSaveClicked();
     void onDeleteClicked();
     void onCompletedToggled(bool completed);
     void onSyncClicked();
+    void onTagSelected(const QString &tag);
+    void onTodoTagAdded(const QString &todoId, const QString &tag);
+    void onTodoTagRemoved(const QString &todoId, const QString &tag);
     
-    // 菜单相关槽函数
     void onImportClicked();
     void onExportClicked();
     void onExitClicked();
     void onDesktopWidgetClicked();
     
-    // 桌面小贴士相关槽函数
     void onDesktopNewTodo(const QString &title);
     void onDesktopTodoToggled(const QString &itemId, bool completed);
     void onShowMainWindow();
     
-    // 日历视图相关槽函数
     void onCalendarTodoAdded(const QString &title, const QDate &date);
     void onCalendarTodoToggled(const QString &itemId, bool completed);
     void onCalendarTodoDeleted(const QString &itemId);
     
-    // 系统托盘相关槽函数
     void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
     void onShowFromTray();
     void onExitFromTray();
@@ -72,45 +75,45 @@ private slots:
 private:
     Ui::MainWindow *ui;
     
-    // 数据管理
     QList<TodoFolder> m_folders;
     TodoFolder* m_currentFolder;
     TodoItem* m_currentItem;
+    QString m_selectedTag;
     
-    // 桌面小贴士
     DesktopWidget* m_desktopWidget;
-    
-    // 日历视图
     CalendarWidget* m_calendarWidget;
+    TagWidget* m_tagWidget;
     
-    // 系统托盘
     QSystemTrayIcon* m_trayIcon;
     QMenu* m_trayMenu;
     QAction* m_showAction;
     QAction* m_exitAction;
     
-    // 界面更新方法
+    QSqlDatabase m_db;
+    
     void updateFolderList();
     void updateTodoList();
     void updateDetailPanel();
     void clearDetailPanel();
     void updateDesktopWidget();
     void updateCalendarWidget();
+    void updateTagWidget();
+    void updateTodoTags();
     
-    // 数据操作方法
+    void initDatabase();
     void loadData();
     void saveData();
+    void migrateFromJson();
     TodoFolder* findFolderById(const QString &folderId);
     TodoFolder* findOrCreateTodayFolder();
     
-    // 初始化方法
     void setupConnections();
     void initializeData();
     void setupDesktopWidget();
     void setupCalendarWidget();
+    void setupTagWidget();
     void setupSystemTray();
     
-    // 重写事件处理
     void closeEvent(QCloseEvent *event) override;
 };
 #endif // MAINWINDOW_H

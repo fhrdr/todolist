@@ -5,6 +5,8 @@ TodoFolder::TodoFolder()
     : m_id(QUuid::createUuid().toString(QUuid::WithoutBraces))
     , m_name("新建文件夹")
     , m_createdTime(QDateTime::currentDateTime())
+    , m_isPinned(false)
+    , m_color("#2563eb")
 {
 }
 
@@ -12,6 +14,8 @@ TodoFolder::TodoFolder(const QString &name)
     : m_id(QUuid::createUuid().toString(QUuid::WithoutBraces))
     , m_name(name)
     , m_createdTime(QDateTime::currentDateTime())
+    , m_isPinned(false)
+    , m_color("#2563eb")
 {
 }
 
@@ -44,7 +48,6 @@ int TodoFolder::getPendingCount() const
 
 void TodoFolder::addItem(const TodoItem &item)
 {
-    // 设置待办事项的文件夹ID
     TodoItem newItem = item;
     newItem.setFolderId(m_id);
     m_items.append(newItem);
@@ -95,6 +98,8 @@ QJsonObject TodoFolder::toJson() const
     json["id"] = m_id;
     json["name"] = m_name;
     json["createdTime"] = m_createdTime.toString(Qt::ISODate);
+    json["isPinned"] = m_isPinned;
+    json["color"] = m_color;
     
     QJsonArray itemsArray;
     for (const TodoItem &item : m_items) {
@@ -110,23 +115,22 @@ void TodoFolder::fromJson(const QJsonObject &json)
     m_id = json["id"].toString();
     m_name = json["name"].toString();
     m_createdTime = QDateTime::fromString(json["createdTime"].toString(), Qt::ISODate);
+    m_isPinned = json["isPinned"].toBool(false);
+    m_color = json["color"].toString("#2563eb");
     
-    // 如果ID为空，生成新的ID
     if (m_id.isEmpty()) {
         m_id = QUuid::createUuid().toString(QUuid::WithoutBraces);
     }
     
-    // 如果创建时间无效，设置为当前时间
     if (!m_createdTime.isValid()) {
         m_createdTime = QDateTime::currentDateTime();
     }
     
-    // 加载待办事项
     m_items.clear();
     QJsonArray itemsArray = json["items"].toArray();
     for (const QJsonValue &value : itemsArray) {
         TodoItem item(value.toObject());
-        item.setFolderId(m_id); // 确保文件夹ID正确
+        item.setFolderId(m_id);
         m_items.append(item);
     }
 }

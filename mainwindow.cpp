@@ -2,6 +2,10 @@
 #include "ui_mainwindow.h"
 #include <QStandardPaths>
 #include <QDir>
+#include <QSqlQuery>
+#include <QSqlError>
+#include <QVBoxLayout>
+#include <QMenu>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -9,6 +13,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_currentFolder(nullptr)
     , m_currentItem(nullptr)
     , m_desktopWidget(nullptr)
+    , m_tagWidget(nullptr)
     , m_trayIcon(nullptr)
     , m_trayMenu(nullptr)
     , m_showAction(nullptr)
@@ -16,10 +21,8 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     
-    // 设置窗口图标
     QIcon windowIcon(":/icons/app.ico");
     if (windowIcon.isNull()) {
-        // 如果资源图标加载失败，尝试文件路径
         QString iconPath = QDir::currentPath() + "/icons/app.ico";
         windowIcon = QIcon(iconPath);
         if (windowIcon.isNull()) {
@@ -28,13 +31,16 @@ MainWindow::MainWindow(QWidget *parent)
     }
     setWindowIcon(windowIcon);
     
-    initializeData();
+    initDatabase();
+    migrateFromJson();
     loadData();
     updateFolderList();
     setupConnections();
     setupDesktopWidget();
     setupCalendarWidget();
+    setupTagWidget();
     updateCalendarWidget();
+    updateTagWidget();
     setupSystemTray();
 }
 
@@ -45,43 +51,263 @@ MainWindow::~MainWindow()
         m_desktopWidget->close();
         delete m_desktopWidget;
     }
+    if (m_db.isOpen()) {
+        m_db.close();
+    }
     delete ui;
+}
+
+void MainWindow::initDatabase()
+{
+    QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir dir(dataPath);
+    if (!dir.exists()) {
+        dir.mkpath(".");
+    }
+    
+    QString dbPath = dataPath + "/todolist.db";
+    m_db = QSqlDatabase::addDatabase("QSQLITE");
+    m_db.setDatabaseName(dbPath);
+    
+    if (!m_db.open()) {
+        QMessageBox::critical(this, "数据库错误", "无法打开数据库: " + m_db.lastError().text());
+        return;
+    }
+    
+    QSqlQuery query;
+    query.exec("CREATE TABLE IF NOT EXISTS folders ("
+               "id TEXT PRIMARY KEY, "
+               "name TEXT NOT NULL, "
+               "createdTime TEXT, "
+               "isPinned INTEGER DEFAULT 0, "
+               "color TEXT DEFAULT '#2563eb')");
+    
+    query.exec("CREATE TABLE IF NOT EXISTS items ("
+               "id TEXT PRIMARY KEY, "
+               "title TEXT NOT NULL, "
+               "details TEXT, "
+               "createdTime TEXT, "
+               "completedTime TEXT, "
+               "updatedTime TEXT, "
+               "isCompleted INTEGER DEFAULT 0, "
+               "folderId TEXT, "
+               "plannedDate TEXT, "
+               "dueDate TEXT, "
+               "priority INTEGER DEFAULT 0, "
+               "tagColor TEXT DEFAULT '#2563eb', "
+               "isPinned INTEGER DEFAULT 0, "
+               "FOREIGN KEY(folderId) REFERENCES folders(id))");
+    
+    query.exec("CREATE TABLE IF NOT EXISTS tags ("
+               "id TEXT PRIMARY KEY, "
+               "name TEXT NOT NULL UNIQUE, "
+               "color TEXT DEFAULT '#2563eb')");
+    
+    query.exec("CREATE TABLE IF NOT EXISTS item_tags ("
+               "itemId TEXT, "
+               "tagId TEXT, "
+               "PRIMARY KEY(itemId, tagId), "
+               "FOREIGN KEY(itemId) REFERENCES items(id), "
+               "FOREIGN KEY(tagId) REFERENCES tags(id))");
+}
+
+void MainWindow::migrateFromJson()
+{
+    QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QString jsonPath = dataPath + "/todolist.json";
+    
+    if (!QFile::exists(jsonPath)) {
+        return;
+    }
+    
+    QFile file(jsonPath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return;
+    }
+    
+    QByteArray data = file.readAll();
+    file.close();
+    
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+    if (!doc.isObject()) {
+        return;
+    }
+    
+    QJsonObject root = doc.object();
+    QJsonArray foldersArray = root["folders"].toArray();
+    
+    QSqlQuery query;
+    
+    for (const QJsonValue &folderVal : foldersArray) {
+        QJsonObject folderObj = folderVal.toObject();
+        
+        query.prepare("INSERT OR REPLACE INTO folders (id, name, createdTime, isPinned, color) VALUES (?, ?, ?, ?, ?)");
+        query.addBindValue(folderObj["id"].toString());
+        query.addBindValue(folderObj["name"].toString());
+        query.addBindValue(folderObj["createdTime"].toString());
+        query.addBindValue(folderObj["isPinned"].toBool() ? 1 : 0);
+        query.addBindValue(folderObj["color"].toString("#2563eb"));
+        query.exec();
+        
+        QJsonArray itemsArray = folderObj["items"].toArray();
+        for (const QJsonValue &itemVal : itemsArray) {
+            QJsonObject itemObj = itemVal.toObject();
+            
+            query.prepare("INSERT OR REPLACE INTO items (id, title, details, createdTime, completedTime, updatedTime, isCompleted, folderId, plannedDate, dueDate, priority, tagColor, isPinned) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            query.addBindValue(itemObj["id"].toString());
+            query.addBindValue(itemObj["title"].toString());
+            query.addBindValue(itemObj["details"].toString());
+            query.addBindValue(itemObj["createdTime"].toString());
+            query.addBindValue(itemObj["completedTime"].toString());
+            query.addBindValue(itemObj["updatedTime"].toString());
+            query.addBindValue(itemObj["isCompleted"].toBool() ? 1 : 0);
+            query.addBindValue(folderObj["id"].toString());
+            query.addBindValue(itemObj["plannedDate"].toString());
+            query.addBindValue(itemObj["dueDate"].toString());
+            query.addBindValue(itemObj["priority"].toInt(0));
+            query.addBindValue(itemObj["tagColor"].toString("#2563eb"));
+            query.addBindValue(itemObj["isPinned"].toBool() ? 1 : 0);
+            query.exec();
+        }
+    }
+    
+    QString backupPath = jsonPath + ".backup";
+    QFile::rename(jsonPath, backupPath);
+}
+
+void MainWindow::loadData()
+{
+    m_folders.clear();
+    
+    QSqlQuery folderQuery("SELECT id, name, createdTime, isPinned, color FROM folders ORDER BY isPinned DESC, createdTime DESC");
+    
+    while (folderQuery.next()) {
+        TodoFolder folder;
+        folder.setId(folderQuery.value(0).toString());
+        folder.setName(folderQuery.value(1).toString());
+        folder.setCreatedTime(QDateTime::fromString(folderQuery.value(2).toString(), Qt::ISODate));
+        folder.setPinned(folderQuery.value(3).toInt() == 1);
+        folder.setColor(folderQuery.value(4).toString());
+        
+        QSqlQuery itemQuery;
+        itemQuery.prepare("SELECT id, title, details, createdTime, completedTime, updatedTime, isCompleted, folderId, plannedDate, dueDate, priority, tagColor, isPinned FROM items WHERE folderId = ? ORDER BY isPinned DESC, createdTime DESC");
+        itemQuery.addBindValue(folder.getId());
+        itemQuery.exec();
+        
+        while (itemQuery.next()) {
+            TodoItem item;
+            item.setId(itemQuery.value(0).toString());
+            item.setTitle(itemQuery.value(1).toString());
+            item.setDetails(itemQuery.value(2).toString());
+            item.setCreatedTime(QDateTime::fromString(itemQuery.value(3).toString(), Qt::ISODate));
+            item.setCompletedTime(QDateTime::fromString(itemQuery.value(4).toString(), Qt::ISODate));
+            item.setUpdatedTime(QDateTime::fromString(itemQuery.value(5).toString(), Qt::ISODate));
+            item.setCompleted(itemQuery.value(6).toInt() == 1);
+            item.setFolderId(itemQuery.value(7).toString());
+            item.setPlannedDate(QDate::fromString(itemQuery.value(8).toString(), Qt::ISODate));
+            item.setDueDate(QDate::fromString(itemQuery.value(9).toString(), Qt::ISODate));
+            item.setPriority(itemQuery.value(10).toInt());
+            item.setTagColor(itemQuery.value(11).toString());
+            item.setPinned(itemQuery.value(12).toInt() == 1);
+            
+            QSqlQuery tagQuery;
+            tagQuery.prepare("SELECT t.name FROM tags t JOIN item_tags it ON t.id = it.tagId WHERE it.itemId = ?");
+            tagQuery.addBindValue(item.getId());
+            tagQuery.exec();
+            
+            QStringList tags;
+            while (tagQuery.next()) {
+                tags.append(tagQuery.value(0).toString());
+            }
+            item.setTags(tags);
+            
+            folder.addItem(item);
+        }
+        
+        m_folders.append(folder);
+    }
+    
+    if (m_folders.isEmpty()) {
+        TodoFolder defaultFolder("默认文件夹");
+        m_folders.append(defaultFolder);
+        
+        TodoItem sampleItem("欢迎使用Todo List", "这是一个示例待办事项，您可以编辑或删除它。");
+        m_folders[0].addItem(sampleItem);
+    }
+}
+
+void MainWindow::saveData()
+{
+    QSqlQuery query;
+    
+    query.exec("DELETE FROM item_tags");
+    query.exec("DELETE FROM items");
+    query.exec("DELETE FROM folders");
+    
+    for (const TodoFolder &folder : m_folders) {
+        query.prepare("INSERT INTO folders (id, name, createdTime, isPinned, color) VALUES (?, ?, ?, ?, ?)");
+        query.addBindValue(folder.getId());
+        query.addBindValue(folder.getName());
+        query.addBindValue(folder.getCreatedTime().toString(Qt::ISODate));
+        query.addBindValue(folder.isPinned() ? 1 : 0);
+        query.addBindValue(folder.getColor());
+        query.exec();
+        
+        for (const TodoItem &item : folder.getItems()) {
+            query.prepare("INSERT INTO items (id, title, details, createdTime, completedTime, updatedTime, isCompleted, folderId, plannedDate, dueDate, priority, tagColor, isPinned) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            query.addBindValue(item.getId());
+            query.addBindValue(item.getTitle());
+            query.addBindValue(item.getDetails());
+            query.addBindValue(item.getCreatedTime().toString(Qt::ISODate));
+            query.addBindValue(item.getCompletedTime().toString(Qt::ISODate));
+            query.addBindValue(item.getUpdatedTime().toString(Qt::ISODate));
+            query.addBindValue(item.isCompleted() ? 1 : 0);
+            query.addBindValue(folder.getId());
+            query.addBindValue(item.getPlannedDate().toString(Qt::ISODate));
+            query.addBindValue(item.getDueDate().toString(Qt::ISODate));
+            query.addBindValue(item.getPriority());
+            query.addBindValue(item.getTagColor());
+            query.addBindValue(item.isPinned() ? 1 : 0);
+            query.exec();
+            
+            for (const QString &tag : item.getTags()) {
+                query.prepare("INSERT OR IGNORE INTO tags (id, name) VALUES (?, ?)");
+                query.addBindValue(QUuid::createUuid().toString(QUuid::WithoutBraces));
+                query.addBindValue(tag);
+                query.exec();
+                
+                query.prepare("INSERT INTO item_tags (itemId, tagId) SELECT ?, id FROM tags WHERE name = ?");
+                query.addBindValue(item.getId());
+                query.addBindValue(tag);
+                query.exec();
+            }
+        }
+    }
 }
 
 void MainWindow::setupConnections()
 {
-    // 文件夹相关连接
     connect(ui->newFolderBtn, &QPushButton::clicked, this, &MainWindow::onNewFolderClicked);
     connect(ui->deleteFolderBtn, &QPushButton::clicked, this, &MainWindow::onDeleteFolderClicked);
     connect(ui->folderListWidget, &QListWidget::currentRowChanged, this, &MainWindow::onFolderSelectionChanged);
     connect(ui->folderListWidget, &QListWidget::itemDoubleClicked, this, &MainWindow::onFolderDoubleClicked);
+    ui->folderListWidget->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(ui->folderListWidget, &QListWidget::customContextMenuRequested, this, &MainWindow::onFolderContextMenu);
     
-    // 待办事项相关连接
     connect(ui->newTodoBtn, &QPushButton::clicked, this, &MainWindow::onNewTodoClicked);
     connect(ui->todoListWidget, &QListWidget::currentRowChanged, this, &MainWindow::onTodoSelectionChanged);
+    ui->todoListWidget->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(ui->todoListWidget, &QListWidget::customContextMenuRequested, this, &MainWindow::onTodoContextMenu);
+    connect(ui->todoListWidget, &QListWidget::itemDoubleClicked, this, &MainWindow::onTodoDoubleClicked);
     connect(ui->saveBtn, &QPushButton::clicked, this, &MainWindow::onSaveClicked);
     connect(ui->deleteBtn, &QPushButton::clicked, this, &MainWindow::onDeleteClicked);
     connect(ui->completedCheckBox, &QCheckBox::toggled, this, &MainWindow::onCompletedToggled);
     connect(ui->syncBtn, &QPushButton::clicked, this, &MainWindow::onSyncClicked);
     
-    // 菜单相关连接
     connect(ui->actionImport, &QAction::triggered, this, &MainWindow::onImportClicked);
     connect(ui->actionExport, &QAction::triggered, this, &MainWindow::onExportClicked);
     connect(ui->actionExit, &QAction::triggered, this, &MainWindow::onExitClicked);
     connect(ui->actionDesktopWidget, &QAction::triggered, this, &MainWindow::onDesktopWidgetClicked);
-}
-
-void MainWindow::initializeData()
-{
-    // 创建默认文件夹
-    if (m_folders.isEmpty()) {
-        TodoFolder defaultFolder("默认文件夹");
-        m_folders.append(defaultFolder);
-        
-        // 添加示例待办事项
-        TodoItem sampleItem("欢迎使用Todo List", "这是一个示例待办事项，您可以编辑或删除它。");
-        m_folders[0].addItem(sampleItem);
-    }
 }
 
 void MainWindow::onNewFolderClicked()
@@ -94,134 +320,122 @@ void MainWindow::onNewFolderClicked()
         m_folders.append(newFolder);
         updateFolderList();
         updateCalendarWidget();
+        updateTagWidget();
         saveData();
         
-        // 选中新创建的文件夹
         ui->folderListWidget->setCurrentRow(m_folders.size() - 1);
     }
 }
 
 void MainWindow::onFolderSelectionChanged()
 {
-    QListWidgetItem *currentItem = ui->folderListWidget->currentItem();
-    if (currentItem) {
-        QString folderId = currentItem->data(Qt::UserRole).toString();
-        m_currentFolder = findFolderById(folderId);
-        m_currentItem = nullptr;
+    int row = ui->folderListWidget->currentRow();
+    if (row >= 0 && row < m_folders.size()) {
+        m_currentFolder = &m_folders[row];
         updateTodoList();
-        clearDetailPanel();
-        
-        // 启用删除按钮
-        ui->deleteFolderBtn->setEnabled(true);
+        updateDetailPanel();
     } else {
         m_currentFolder = nullptr;
-        // 禁用删除按钮
-        ui->deleteFolderBtn->setEnabled(false);
+        ui->todoListWidget->clear();
+        clearDetailPanel();
     }
 }
 
 void MainWindow::onDeleteFolderClicked()
 {
-    QListWidgetItem *currentItem = ui->folderListWidget->currentItem();
-    if (currentItem && m_currentFolder) {
-        QString folderName = m_currentFolder->getName();
-        
-        // 确认删除
-        int ret = QMessageBox::question(this, "删除文件夹", 
-                                      QString("确定要删除文件夹 '%1' 吗？\n此操作将删除文件夹内的所有待办事项。").arg(folderName),
-                                      QMessageBox::Yes | QMessageBox::No);
-        
-        if (ret == QMessageBox::Yes) {
-            // 根据文件夹ID删除文件夹
-            QString folderId = m_currentFolder->getId();
-            for (int i = 0; i < m_folders.size(); ++i) {
-                if (m_folders[i].getId() == folderId) {
-                    m_folders.removeAt(i);
-                    break;
-                }
-            }
-            
-            // 重置当前选择
-            m_currentFolder = nullptr;
-            m_currentItem = nullptr;
-            
-            // 更新界面
-            updateFolderList();
-            updateTodoList();
-            clearDetailPanel();
-            updateDesktopWidget();
-            updateCalendarWidget();
-            
-            // 保存数据
-            saveData();
-            
-            // 如果没有文件夹了，禁用删除按钮
-            if (m_folders.isEmpty()) {
-                ui->deleteFolderBtn->setEnabled(false);
-            }
-        }
+    if (!m_currentFolder) {
+        QMessageBox::information(this, "提示", "请先选择一个文件夹。");
+        return;
     }
+    
+    QMessageBox::StandardButton reply = QMessageBox::question(this, "确认删除", 
+        QString("确定要删除文件夹 \"%1\" 及其所有待办事项吗？").arg(m_currentFolder->getName()),
+        QMessageBox::Yes | QMessageBox::No);
+    
+    if (reply == QMessageBox::Yes) {
+        m_folders.removeOne(*m_currentFolder);
+        m_currentFolder = nullptr;
+        
+        updateFolderList();
+        updateCalendarWidget();
+        updateTagWidget();
+        saveData();
+        
+        ui->todoListWidget->clear();
+        clearDetailPanel();
+    }
+}
+
+void MainWindow::onPinFolderClicked()
+{
+    if (!m_currentFolder) return;
+    
+    m_currentFolder->setPinned(!m_currentFolder->isPinned());
+    updateFolderList();
+    saveData();
 }
 
 void MainWindow::onFolderDoubleClicked(QListWidgetItem* item)
 {
-    if (!item) return;
-    
-    // 获取文件夹ID
-    QString folderId = item->data(Qt::UserRole).toString();
-    TodoFolder* folder = findFolderById(folderId);
-    
-    if (!folder) return;
-    
-    // 弹出输入对话框让用户修改文件夹名称
-    bool ok;
-    QString newName = QInputDialog::getText(this, "重命名文件夹", 
-                                          "请输入新的文件夹名称:", 
-                                          QLineEdit::Normal, 
-                                          folder->getName(), &ok);
-    
-    if (ok && !newName.isEmpty() && newName != folder->getName()) {
-        // 更新文件夹名称
-        folder->setName(newName);
+    int row = ui->folderListWidget->row(item);
+    if (row >= 0 && row < m_folders.size()) {
+        bool ok;
+        QString newName = QInputDialog::getText(this, "重命名文件夹", "请输入新的文件夹名称:", 
+            QLineEdit::Normal, m_folders[row].getName(), &ok);
         
-        // 更新界面显示
-        updateFolderList();
-        
-        // 保存数据
-        saveData();
-        
-        // 重新选中该文件夹
-        for (int i = 0; i < ui->folderListWidget->count(); ++i) {
-            QListWidgetItem* listItem = ui->folderListWidget->item(i);
-            if (listItem && listItem->data(Qt::UserRole).toString() == folderId) {
-                ui->folderListWidget->setCurrentItem(listItem);
-                break;
-            }
+        if (ok && !newName.isEmpty()) {
+            m_folders[row].setName(newName);
+            updateFolderList();
+            updateCalendarWidget();
+            saveData();
         }
     }
+}
+
+void MainWindow::onFolderContextMenu(const QPoint &pos)
+{
+    QListWidgetItem *item = ui->folderListWidget->itemAt(pos);
+    if (!item) return;
+    
+    int row = ui->folderListWidget->row(item);
+    if (row < 0 || row >= m_folders.size()) return;
+    
+    m_currentFolder = &m_folders[row];
+    
+    QMenu menu(this);
+    QAction *pinAction = menu.addAction(m_currentFolder->isPinned() ? "取消置顶" : "置顶");
+    QAction *renameAction = menu.addAction("重命名");
+    QAction *deleteAction = menu.addAction("删除");
+    
+    connect(pinAction, &QAction::triggered, this, &MainWindow::onPinFolderClicked);
+    connect(renameAction, &QAction::triggered, [this, item]() { onFolderDoubleClicked(item); });
+    connect(deleteAction, &QAction::triggered, this, &MainWindow::onDeleteFolderClicked);
+    
+    menu.exec(ui->folderListWidget->mapToGlobal(pos));
 }
 
 void MainWindow::onNewTodoClicked()
 {
     if (!m_currentFolder) {
-        QMessageBox::warning(this, "警告", "请先选择一个文件夹！");
+        QMessageBox::information(this, "提示", "请先选择一个文件夹。");
         return;
     }
     
     bool ok;
-    QString title = QInputDialog::getText(this, "新建待办事项", "请输入标题:", QLineEdit::Normal, "新建待办事项", &ok);
+    QString title = QInputDialog::getText(this, "新建待办事项", "请输入待办事项标题:", QLineEdit::Normal, "", &ok);
     
     if (ok && !title.isEmpty()) {
         TodoItem newItem(title);
-        newItem.setPlannedDate(QDate::currentDate()); // 设置计划日期为今日
+        newItem.setPlannedDate(QDate::currentDate());
         m_currentFolder->addItem(newItem);
+        
         updateTodoList();
         updateFolderList();
         updateCalendarWidget();
+        updateTagWidget();
         updateDesktopWidget();
         saveData();
         
-        // 选中新创建的待办事项
         ui->todoListWidget->setCurrentRow(m_currentFolder->getItemCount() - 1);
     }
 }
@@ -230,13 +444,11 @@ void MainWindow::onTodoSelectionChanged()
 {
     if (!m_currentFolder) return;
     
-    int currentRow = ui->todoListWidget->currentRow();
+    int row = ui->todoListWidget->currentRow();
     QList<TodoItem> items = m_currentFolder->getItems();
     
-    if (currentRow >= 0 && currentRow < items.size()) {
-        // 直接使用items中的引用，避免索引不匹配问题
-        QString itemId = items[currentRow].getId();
-        m_currentItem = m_currentFolder->findItem(itemId);
+    if (row >= 0 && row < items.size()) {
+        m_currentItem = m_currentFolder->findItem(items[row].getId());
         updateDetailPanel();
     } else {
         m_currentItem = nullptr;
@@ -244,332 +456,156 @@ void MainWindow::onTodoSelectionChanged()
     }
 }
 
+void MainWindow::onTodoDoubleClicked(QListWidgetItem* item)
+{
+    Q_UNUSED(item)
+    if (m_currentItem) {
+        ui->tabWidget->setCurrentIndex(0);
+    }
+}
+
+void MainWindow::onTodoContextMenu(const QPoint &pos)
+{
+    QListWidgetItem *item = ui->todoListWidget->itemAt(pos);
+    if (!item || !m_currentFolder) return;
+    
+    int row = ui->todoListWidget->row(item);
+    QList<TodoItem> items = m_currentFolder->getItems();
+    if (row < 0 || row >= items.size()) return;
+    
+    m_currentItem = m_currentFolder->findItem(items[row].getId());
+    
+    QMenu menu(this);
+    QAction *pinAction = menu.addAction(m_currentItem->isPinned() ? "取消置顶" : "置顶");
+    menu.addSeparator();
+    QMenu *tagMenu = menu.addMenu("添加标签");
+    
+    QStringList commonTags = {"工作", "学习", "生活", "重要", "紧急"};
+    for (const QString &tag : commonTags) {
+        QAction *tagAction = tagMenu->addAction(tag);
+        connect(tagAction, &QAction::triggered, [this, tag]() {
+            if (m_currentItem) {
+                m_currentItem->addTag(tag);
+                updateTodoList();
+                updateTagWidget();
+                saveData();
+            }
+        });
+    }
+    
+    QAction *deleteAction = menu.addAction("删除");
+    
+    connect(pinAction, &QAction::triggered, [this]() {
+        if (m_currentItem) {
+            m_currentItem->setPinned(!m_currentItem->isPinned());
+            updateTodoList();
+            saveData();
+        }
+    });
+    
+    connect(deleteAction, &QAction::triggered, this, &MainWindow::onDeleteClicked);
+    
+    menu.exec(ui->todoListWidget->mapToGlobal(pos));
+}
+
 void MainWindow::onSaveClicked()
 {
-    if (!m_currentItem || !m_currentFolder) return;
+    if (!m_currentItem) {
+        QMessageBox::information(this, "提示", "请先选择一个待办事项。");
+        return;
+    }
     
-    // 临时断开信号连接，防止递归调用
-    ui->todoListWidget->blockSignals(true);
-    
-    QString currentItemId = m_currentItem->getId();
     m_currentItem->setTitle(ui->titleEdit->text());
     m_currentItem->setDetails(ui->detailsEdit->toPlainText());
     m_currentItem->setCompleted(ui->completedCheckBox->isChecked());
     
-    // 更新列表但保持选中状态
     updateTodoList();
-    
-    // 恢复选中状态
-    QList<TodoItem> items = m_currentFolder->getItems();
-    for (int i = 0; i < items.size(); ++i) {
-        if (items[i].getId() == currentItemId) {
-            ui->todoListWidget->setCurrentRow(i);
-            // 重新获取当前项目指针
-            m_currentItem = m_currentFolder->findItem(currentItemId);
-            break;
-        }
-    }
-    
-    // 恢复信号连接
-    ui->todoListWidget->blockSignals(false);
-    
     updateFolderList();
     updateCalendarWidget();
+    updateTagWidget();
     updateDesktopWidget();
     saveData();
     
-    ui->statusbar->showMessage("保存成功", 2000);
+    QMessageBox::information(this, "提示", "保存成功！");
 }
 
 void MainWindow::onDeleteClicked()
 {
-    if (!m_currentItem || !m_currentFolder) return;
+    if (!m_currentItem || !m_currentFolder) {
+        QMessageBox::information(this, "提示", "请先选择一个待办事项。");
+        return;
+    }
     
-    int ret = QMessageBox::question(this, "确认删除", "确定要删除这个待办事项吗？", 
-                                   QMessageBox::Yes | QMessageBox::No);
+    QMessageBox::StandardButton reply = QMessageBox::question(this, "确认删除", 
+        QString("确定要删除待办事项 \"%1\" 吗？").arg(m_currentItem->getTitle()),
+        QMessageBox::Yes | QMessageBox::No);
     
-    if (ret == QMessageBox::Yes) {
+    if (reply == QMessageBox::Yes) {
         m_currentFolder->removeItem(m_currentItem->getId());
         m_currentItem = nullptr;
+        
         updateTodoList();
-        clearDetailPanel();
         updateFolderList();
         updateCalendarWidget();
+        updateTagWidget();
         updateDesktopWidget();
         saveData();
         
-        ui->statusbar->showMessage("删除成功", 2000);
+        clearDetailPanel();
     }
 }
 
 void MainWindow::onCompletedToggled(bool completed)
 {
-    if (!m_currentItem || !m_currentFolder) return;
-    
-    // 临时断开信号连接，防止递归调用
-    ui->todoListWidget->blockSignals(true);
-    
-    QString currentItemId = m_currentItem->getId();
-    m_currentItem->setCompleted(completed);
-    
-    // 更新列表但保持选中状态
-    updateTodoList();
-    
-    // 恢复选中状态
-    QList<TodoItem> items = m_currentFolder->getItems();
-    for (int i = 0; i < items.size(); ++i) {
-        if (items[i].getId() == currentItemId) {
-            ui->todoListWidget->setCurrentRow(i);
-            // 重新获取当前项目指针
-            m_currentItem = m_currentFolder->findItem(currentItemId);
-            break;
-        }
-    }
-    
-    // 恢复信号连接
-    ui->todoListWidget->blockSignals(false);
-    
-    // 更新详情面板以反映完成状态变化
     if (m_currentItem) {
-        updateDetailPanel();
-    }
-    
-    updateFolderList();
-    updateCalendarWidget();
-    updateDesktopWidget();
-    saveData();
-}
-
-void MainWindow::onSyncClicked()
-{
-    // TODO: 实现云端同步功能
-    QMessageBox::information(this, "同步", "同步功能将在后续版本中实现");
-}
-
-void MainWindow::onImportClicked()
-{
-    QString fileName = QFileDialog::getOpenFileName(this, "导入数据", "", "JSON Files (*.json)");
-    if (fileName.isEmpty()) return;
-    
-    QFile file(fileName);
-    if (!file.open(QIODevice::ReadOnly)) {
-        QMessageBox::warning(this, "错误", "无法打开文件");
-        return;
-    }
-    
-    QByteArray data = file.readAll();
-    QJsonDocument doc = QJsonDocument::fromJson(data);
-    QJsonObject rootObj = doc.object();
-    
-    m_folders.clear();
-    QJsonArray foldersArray = rootObj["folders"].toArray();
-    for (const QJsonValue &value : foldersArray) {
-        TodoFolder folder(value.toObject());
-        m_folders.append(folder);
-    }
-    
-    m_currentFolder = nullptr;
-    m_currentItem = nullptr;
-    updateFolderList();
-    clearDetailPanel();
-    
-    ui->statusbar->showMessage("导入成功", 2000);
-}
-
-void MainWindow::onExportClicked()
-{
-    QString fileName = QFileDialog::getSaveFileName(this, "导出数据", "todolist_backup.json", "JSON Files (*.json)");
-    if (fileName.isEmpty()) return;
-    
-    QJsonObject rootObj;
-    QJsonArray foldersArray;
-    
-    for (const TodoFolder &folder : m_folders) {
-        foldersArray.append(folder.toJson());
-    }
-    
-    rootObj["folders"] = foldersArray;
-    rootObj["exportTime"] = QDateTime::currentDateTime().toString(Qt::ISODate);
-    
-    QJsonDocument doc(rootObj);
-    
-    QFile file(fileName);
-    if (file.open(QIODevice::WriteOnly)) {
-        file.write(doc.toJson());
-        ui->statusbar->showMessage("导出成功", 2000);
-    } else {
-        QMessageBox::warning(this, "错误", "无法保存文件");
-    }
-}
-
-void MainWindow::onExitClicked()
-{
-    close();
-}
-
-void MainWindow::onDesktopWidgetClicked()
-{
-    if (m_desktopWidget) {
-        if (m_desktopWidget->isVisible()) {
-            // 隐藏桌面小窗口
-            m_desktopWidget->hide();
-            ui->actionDesktopWidget->setText("显示桌面小贴士");
-        } else {
-            // 显示桌面小窗口
-            m_desktopWidget->show();
-            ui->actionDesktopWidget->setText("隐藏桌面小贴士");
-        }
-    }
-}
-
-void MainWindow::setupDesktopWidget()
-{
-    m_desktopWidget = new DesktopWidget();
-    
-    // 连接桌面小贴士的信号
-    connect(m_desktopWidget, &DesktopWidget::newTodoRequested, this, &MainWindow::onDesktopNewTodo);
-    connect(m_desktopWidget, &DesktopWidget::todoItemToggled, this, &MainWindow::onDesktopTodoToggled);
-    connect(m_desktopWidget, &DesktopWidget::showMainWindowRequested, this, &MainWindow::onShowMainWindow);
-    
-    // 初始化数据
-    updateDesktopWidget();
-    
-    // 显示桌面小贴士
-    m_desktopWidget->show();
-    
-    // 初始化菜单文本
-    ui->actionDesktopWidget->setText("隐藏桌面小贴士");
-}
-
-void MainWindow::updateDesktopWidget()
-{
-    if (m_desktopWidget) {
-        // 确保m_folders不为空且有效
-        if (!m_folders.isEmpty()) {
-            m_desktopWidget->updateTodoData(m_folders);
-        }
-    }
-}
-
-void MainWindow::onDesktopNewTodo(const QString &title)
-{
-    // 查找或创建今天的文件夹
-    TodoFolder* todayFolder = findOrCreateTodayFolder();
-    
-    if (todayFolder) {
-        TodoItem newItem(title);
-        newItem.setPlannedDate(QDate::currentDate()); // 设置计划日期为今日
-        todayFolder->addItem(newItem);
-        
-        // 更新界面
+        m_currentItem->setCompleted(completed);
         updateTodoList();
         updateFolderList();
+        updateCalendarWidget();
+        updateTagWidget();
         updateDesktopWidget();
         saveData();
     }
 }
 
-void MainWindow::onDesktopTodoToggled(const QString &itemId, bool completed)
+void MainWindow::onSyncClicked()
+{
+    saveData();
+    updateDesktopWidget();
+    updateCalendarWidget();
+    updateTagWidget();
+    QMessageBox::information(this, "同步", "数据已同步！");
+}
+
+void MainWindow::onTagSelected(const QString &tag)
+{
+    m_selectedTag = tag;
+}
+
+void MainWindow::onTodoTagAdded(const QString &todoId, const QString &tag)
 {
     for (TodoFolder &folder : m_folders) {
-        TodoItem* item = folder.findItem(itemId);
+        TodoItem *item = folder.findItem(todoId);
         if (item) {
-            item->setCompleted(completed);
-            
-            updateTodoList();
-            updateFolderList();
-            updateCalendarWidget();
-            updateDesktopWidget();
+            item->addTag(tag);
             saveData();
-            return;
-        }
-    }
-}
-
-void MainWindow::onShowMainWindow()
-{
-    show();
-    raise();
-    activateWindow();
-}
-
-void MainWindow::setupCalendarWidget()
-{
-    // 创建日历组件
-    m_calendarWidget = new CalendarWidget(this);
-    
-    // 将日历组件添加到日历标签页的容器中
-    QVBoxLayout* calendarLayout = new QVBoxLayout(ui->calendarContainer);
-    calendarLayout->addWidget(m_calendarWidget);
-    
-    // 连接日历组件的信号
-    connect(m_calendarWidget, &CalendarWidget::todoItemAdded, this, &MainWindow::onCalendarTodoAdded);
-    connect(m_calendarWidget, &CalendarWidget::todoItemToggled, this, &MainWindow::onCalendarTodoToggled);
-    connect(m_calendarWidget, &CalendarWidget::todoItemDeleted, this, &MainWindow::onCalendarTodoDeleted);
-}
-
-void MainWindow::updateCalendarWidget()
-{
-    if (m_calendarWidget) {
-        // 确保m_folders不为空且有效
-        if (!m_folders.isEmpty()) {
-            m_calendarWidget->updateTodoData(m_folders);
-        }
-    }
-}
-
-
-
-void MainWindow::onCalendarTodoAdded(const QString& title, const QDate& date)
-{
-    // 从日历视图添加新的待办事项
-    TodoItem todoItem(title);
-    todoItem.setPlannedDate(date); // 设置计划日期为选中的日期
-    
-    // 创建指定日期文件夹名称（格式：YYYY-MM-DD）
-    QString dateFolderName = date.toString("yyyy-MM-dd");
-    
-    // 查找是否已存在该日期文件夹
-    TodoFolder* dateFolder = nullptr;
-    for (TodoFolder& folder : m_folders) {
-        if (folder.getName() == dateFolderName) {
-            dateFolder = &folder;
+            updateTodoList();
+            updateTagWidget();
             break;
         }
     }
-    
-    // 如果不存在该日期文件夹，创建一个
-    if (!dateFolder) {
-        TodoFolder newDateFolder(dateFolderName);
-        m_folders.append(newDateFolder);
-        dateFolder = &m_folders.last();
-    }
-    
-    // 将待办事项添加到指定日期文件夹
-    todoItem.setFolderId(dateFolder->getId());
-    dateFolder->addItem(todoItem);
-    
-    // 保存数据并更新界面
-    saveData();
-    updateFolderList();
-    updateTodoList();
-    updateCalendarWidget();
-    updateDesktopWidget();
 }
 
-void MainWindow::onCalendarTodoToggled(const QString& itemId, bool completed)
+void MainWindow::onTodoTagRemoved(const QString &todoId, const QString &tag)
 {
-    for (TodoFolder& folder : m_folders) {
-        TodoItem* item = folder.findItem(itemId);
+    for (TodoFolder &folder : m_folders) {
+        TodoItem *item = folder.findItem(todoId);
         if (item) {
-            item->setCompleted(completed);
-            
-            updateTodoList();
-            updateFolderList();
-            updateCalendarWidget();
-            updateDesktopWidget();
+            item->removeTag(tag);
             saveData();
-            return;
+            updateTodoList();
+            updateTagWidget();
+            break;
         }
     }
 }
@@ -578,20 +614,22 @@ void MainWindow::updateFolderList()
 {
     ui->folderListWidget->clear();
     
-    // 创建文件夹的副本用于排序，按创建时间倒序排列
     QList<TodoFolder> sortedFolders = m_folders;
     std::sort(sortedFolders.begin(), sortedFolders.end(), [](const TodoFolder &a, const TodoFolder &b) {
-        return a.getCreatedTime() > b.getCreatedTime(); // 倒序：新的在前
+        if (a.isPinned() != b.isPinned()) {
+            return a.isPinned() > b.isPinned();
+        }
+        return a.getCreatedTime() > b.getCreatedTime();
     });
     
     for (const TodoFolder &folder : sortedFolders) {
-        QString displayText = QString("%1 (%2/%3)")
-                             .arg(folder.getName())
-                             .arg(folder.getCompletedCount())
-                             .arg(folder.getItemCount());
+        QString displayText = folder.getName();
+        if (folder.isPinned()) {
+            displayText = "📌 " + displayText;
+        }
+        displayText += QString(" (%1/%2)").arg(folder.getCompletedCount()).arg(folder.getItemCount());
         
         QListWidgetItem *item = new QListWidgetItem(displayText);
-        // 存储原始文件夹的ID，用于后续操作
         item->setData(Qt::UserRole, folder.getId());
         ui->folderListWidget->addItem(item);
     }
@@ -604,21 +642,46 @@ void MainWindow::updateTodoList()
     if (!m_currentFolder) return;
     
     QList<TodoItem> items = m_currentFolder->getItems();
+    std::sort(items.begin(), items.end(), [](const TodoItem &a, const TodoItem &b) {
+        if (a.isPinned() != b.isPinned()) {
+            return a.isPinned() > b.isPinned();
+        }
+        if (a.isCompleted() != b.isCompleted()) {
+            return a.isCompleted() < b.isCompleted();
+        }
+        return a.getCreatedTime() > b.getCreatedTime();
+    });
+    
     for (const TodoItem &item : items) {
-        QListWidgetItem *listItem = new QListWidgetItem();
+        QString displayText;
+        if (item.isPinned()) {
+            displayText = "📌 ";
+        }
+        displayText += item.getTitle();
         
-        QString displayText = item.getTitle();
-        if (item.isCompleted()) {
-            displayText = "✓ " + displayText;
-            listItem->setForeground(QColor(128, 128, 128)); // 灰色
-            QFont font = listItem->font();
-            font.setStrikeOut(true);
-            listItem->setFont(font);
+        QString subText;
+        if (!item.getDetails().isEmpty()) {
+            subText = item.getDetails().left(30);
+            if (item.getDetails().length() > 30) subText += "...";
         } else {
-            displayText = "○ " + displayText;
+            subText = QString::fromUtf8("还没有写任何内容呢~");
         }
         
-        listItem->setText(displayText);
+        QString dateText;
+        if (item.getPlannedDate().isValid()) {
+            dateText = item.getPlannedDate().toString("MM-dd");
+        }
+        
+        QString fullText = displayText + "\n" + subText + "  " + dateText;
+        
+        QListWidgetItem *listItem = new QListWidgetItem();
+        listItem->setText(fullText);
+        
+        if (item.isCompleted()) {
+            listItem->setForeground(QColor(156, 163, 175));
+        }
+        
+        listItem->setData(Qt::UserRole, item.getId());
         ui->todoListWidget->addItem(listItem);
     }
 }
@@ -630,7 +693,6 @@ void MainWindow::updateDetailPanel()
         return;
     }
     
-    // 安全检查UI控件是否存在
     if (!ui->titleEdit || !ui->detailsEdit || !ui->createdTimeLabel || 
         !ui->completedTimeLabel || !ui->completedTimeLabel_title || 
         !ui->completedCheckBox || !ui->saveBtn || !ui->deleteBtn) {
@@ -641,7 +703,6 @@ void MainWindow::updateDetailPanel()
     ui->detailsEdit->setPlainText(m_currentItem->getDetails());
     ui->createdTimeLabel->setText(m_currentItem->getCreatedTime().toString("yyyy-MM-dd hh:mm:ss"));
     
-    // 显示完成时间
     if (m_currentItem->isCompleted() && !m_currentItem->getCompletedTime().isNull()) {
         ui->completedTimeLabel->setText(m_currentItem->getCompletedTime().toString("yyyy-MM-dd hh:mm:ss"));
         ui->completedTimeLabel_title->setVisible(true);
@@ -654,7 +715,6 @@ void MainWindow::updateDetailPanel()
     
     ui->completedCheckBox->setChecked(m_currentItem->isCompleted());
     
-    // 启用编辑控件
     ui->titleEdit->setEnabled(true);
     ui->detailsEdit->setEnabled(true);
     ui->completedCheckBox->setEnabled(true);
@@ -664,7 +724,6 @@ void MainWindow::updateDetailPanel()
 
 void MainWindow::clearDetailPanel()
 {
-    // 安全检查UI控件是否存在
     if (!ui->titleEdit || !ui->detailsEdit || !ui->createdTimeLabel || 
         !ui->completedTimeLabel || !ui->completedTimeLabel_title || 
         !ui->completedCheckBox || !ui->saveBtn || !ui->deleteBtn) {
@@ -679,7 +738,6 @@ void MainWindow::clearDetailPanel()
     ui->completedTimeLabel->setVisible(false);
     ui->completedCheckBox->setChecked(false);
     
-    // 禁用编辑控件
     ui->titleEdit->setEnabled(false);
     ui->detailsEdit->setEnabled(false);
     ui->completedCheckBox->setEnabled(false);
@@ -687,91 +745,209 @@ void MainWindow::clearDetailPanel()
     ui->deleteBtn->setEnabled(false);
 }
 
-void MainWindow::loadData()
+void MainWindow::setupDesktopWidget()
 {
-    // QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    // QDir().mkpath(dataPath);
-    // QString filePath = dataPath + "/todolist.json";
-    // QString filePath = "todolist.json";
-    QString filePath = "./todolist_json/todolist.json";
+    m_desktopWidget = new DesktopWidget();
+    m_desktopWidget->updateTodoData(m_folders);
     
-    QFile file(filePath);
-    if (!file.exists()) return;
-    
-    if (file.open(QIODevice::ReadOnly)) {
-        QByteArray data = file.readAll();
-        file.close(); // 确保文件被正确关闭
-        
-        // 检查数据是否为空
-        if (data.isEmpty()) {
-            qDebug() << "Warning: todolist.json is empty";
-            return;
-        }
-        
-        QJsonParseError parseError;
-        QJsonDocument doc = QJsonDocument::fromJson(data, &parseError);
-        
-        // 检查JSON解析是否成功
-        if (parseError.error != QJsonParseError::NoError) {
-            qDebug() << "JSON parse error:" << parseError.errorString();
-            return;
-        }
-        
-        QJsonObject rootObj = doc.object();
-        
-        // 安全地清空现有数据
-        m_folders.clear();
-        
-        QJsonArray foldersArray = rootObj["folders"].toArray();
-        for (const QJsonValue &value : foldersArray) {
-            if (value.isObject()) {
-                TodoFolder folder(value.toObject());
-                m_folders.append(folder);
-            }
-        }
-        
-        // 注意：不在这里调用updateCalendarWidget，因为此时CalendarWidget可能还未创建
+    connect(m_desktopWidget, &DesktopWidget::newTodoRequested, this, &MainWindow::onDesktopNewTodo);
+    connect(m_desktopWidget, &DesktopWidget::todoItemToggled, this, &MainWindow::onDesktopTodoToggled);
+    connect(m_desktopWidget, &DesktopWidget::showMainWindowRequested, this, &MainWindow::onShowMainWindow);
+}
+
+void MainWindow::updateDesktopWidget()
+{
+    if (m_desktopWidget) {
+        m_desktopWidget->updateTodoData(m_folders);
     }
 }
 
-void MainWindow::saveData()
+void MainWindow::onDesktopNewTodo(const QString &title)
 {
-    // QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    // QDir().mkpath(dataPath);
-    // QString filePath = dataPath + "/todolist.json";
-    QString filePath = "./todolist_json/todolist.json";
+    TodoFolder* todayFolder = findOrCreateTodayFolder();
     
-    QJsonObject rootObj;
-    QJsonArray foldersArray;
+    TodoItem newItem(title);
+    newItem.setPlannedDate(QDate::currentDate());
+    todayFolder->addItem(newItem);
+    
+    saveData();
+    updateFolderList();
+    updateTodoList();
+    updateCalendarWidget();
+    updateTagWidget();
+    updateDesktopWidget();
+}
 
-    // 如果filePath不存在，创建目录
-    QFileInfo fileInfo(filePath);
-    if (!fileInfo.dir().exists()) {
-        QDir().mkpath(fileInfo.dir().absolutePath());
-    }
-    
-    for (const TodoFolder &folder : m_folders) {
-        foldersArray.append(folder.toJson());
-    }
-    
-    rootObj["folders"] = foldersArray;
-    rootObj["saveTime"] = QDateTime::currentDateTime().toString(Qt::ISODate);
-    
-    QJsonDocument doc(rootObj);
-    
-    QFile file(filePath);
-    if (file.open(QIODevice::WriteOnly)) {
-        qint64 bytesWritten = file.write(doc.toJson());
-        file.flush(); // 确保数据被写入磁盘
-        file.close(); // 确保文件被正确关闭
-        
-        if (bytesWritten == -1) {
-            qDebug() << "Error: Failed to write data to file";
-        } else {
-            qDebug() << "Data saved successfully, bytes written:" << bytesWritten;
+void MainWindow::onDesktopTodoToggled(const QString &itemId, bool completed)
+{
+    for (TodoFolder &folder : m_folders) {
+        TodoItem* item = folder.findItem(itemId);
+        if (item) {
+            item->setCompleted(completed);
+            
+            updateTodoList();
+            updateFolderList();
+            updateCalendarWidget();
+            updateTagWidget();
+            updateDesktopWidget();
+            saveData();
+            return;
         }
-    } else {
-        qDebug() << "Error: Cannot open file for writing:" << file.errorString();
+    }
+}
+
+void MainWindow::onShowMainWindow()
+{
+    show();
+    activateWindow();
+    raise();
+}
+
+void MainWindow::setupCalendarWidget()
+{
+    m_calendarWidget = new CalendarWidget(this);
+    
+    QVBoxLayout* calendarLayout = new QVBoxLayout(ui->calendarContainer);
+    calendarLayout->setContentsMargins(0, 0, 0, 0);
+    calendarLayout->addWidget(m_calendarWidget);
+    
+    connect(m_calendarWidget, &CalendarWidget::todoItemAdded, this, &MainWindow::onCalendarTodoAdded);
+    connect(m_calendarWidget, &CalendarWidget::todoItemToggled, this, &MainWindow::onCalendarTodoToggled);
+    connect(m_calendarWidget, &CalendarWidget::todoItemDeleted, this, &MainWindow::onCalendarTodoDeleted);
+}
+
+void MainWindow::updateCalendarWidget()
+{
+    if (m_calendarWidget) {
+        m_calendarWidget->updateTodoData(m_folders);
+    }
+}
+
+void MainWindow::onCalendarTodoAdded(const QString &title, const QDate &date)
+{
+    TodoItem todoItem(title);
+    todoItem.setPlannedDate(date);
+    
+    QString dateFolderName = date.toString("yyyy-MM-dd");
+    
+    TodoFolder* dateFolder = nullptr;
+    for (TodoFolder& folder : m_folders) {
+        if (folder.getName() == dateFolderName) {
+            dateFolder = &folder;
+            break;
+        }
+    }
+    
+    if (!dateFolder) {
+        TodoFolder newDateFolder(dateFolderName);
+        m_folders.append(newDateFolder);
+        dateFolder = &m_folders.last();
+    }
+    
+    todoItem.setFolderId(dateFolder->getId());
+    dateFolder->addItem(todoItem);
+    
+    saveData();
+    updateFolderList();
+    updateTodoList();
+    updateCalendarWidget();
+    updateTagWidget();
+    updateDesktopWidget();
+}
+
+void MainWindow::onCalendarTodoToggled(const QString &itemId, bool completed)
+{
+    for (TodoFolder& folder : m_folders) {
+        TodoItem* item = folder.findItem(itemId);
+        if (item) {
+            item->setCompleted(completed);
+            
+            updateTodoList();
+            updateFolderList();
+            updateCalendarWidget();
+            updateTagWidget();
+            updateDesktopWidget();
+            saveData();
+            return;
+        }
+    }
+}
+
+void MainWindow::onCalendarTodoDeleted(const QString &itemId)
+{
+    for (TodoFolder &folder : m_folders) {
+        if (folder.findItem(itemId)) {
+            folder.removeItem(itemId);
+            saveData();
+            updateFolderList();
+            updateTodoList();
+            updateCalendarWidget();
+            updateTagWidget();
+            updateDesktopWidget();
+            break;
+        }
+    }
+}
+
+void MainWindow::setupTagWidget()
+{
+    m_tagWidget = new TagWidget(this);
+    
+    QVBoxLayout* tagLayout = new QVBoxLayout(ui->tagContainer);
+    tagLayout->setContentsMargins(0, 0, 0, 0);
+    tagLayout->addWidget(m_tagWidget);
+    
+    connect(m_tagWidget, &TagWidget::tagSelected, this, &MainWindow::onTagSelected);
+    connect(m_tagWidget, &TagWidget::todoClicked, [this](const QString &todoId, const QString &folderId) {
+        for (int i = 0; i < m_folders.size(); ++i) {
+            if (m_folders[i].getId() == folderId) {
+                ui->folderListWidget->setCurrentRow(i);
+                QList<TodoItem> items = m_folders[i].getItems();
+                for (int j = 0; j < items.size(); ++j) {
+                    if (items[j].getId() == todoId) {
+                        ui->todoListWidget->setCurrentRow(j);
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+        ui->tabWidget->setCurrentIndex(0);
+    });
+    connect(m_tagWidget, &TagWidget::todoToggled, [this](const QString &todoId, bool completed) {
+        for (TodoFolder &folder : m_folders) {
+            TodoItem *item = folder.findItem(todoId);
+            if (item) {
+                item->setCompleted(completed);
+                saveData();
+                updateTodoList();
+                updateFolderList();
+                updateCalendarWidget();
+                updateTagWidget();
+                updateDesktopWidget();
+                break;
+            }
+        }
+    });
+    connect(m_tagWidget, &TagWidget::tagCreated, [this](const QString &tag) {
+        Q_UNUSED(tag)
+        updateTagWidget();
+    });
+    connect(m_tagWidget, &TagWidget::tagDeleted, [this](const QString &tag) {
+        for (TodoFolder &folder : m_folders) {
+            for (TodoItem &item : folder.getItems()) {
+                item.removeTag(tag);
+            }
+        }
+        saveData();
+        updateTagWidget();
+    });
+}
+
+void MainWindow::updateTagWidget()
+{
+    if (m_tagWidget) {
+        m_tagWidget->updateData(m_folders);
     }
 }
 
@@ -789,59 +965,35 @@ TodoFolder* MainWindow::findOrCreateTodayFolder()
 {
     QString todayString = QDate::currentDate().toString("yyyy-MM-dd");
     
-    // 首先查找是否已存在今天的文件夹
     for (TodoFolder &folder : m_folders) {
         if (folder.getName() == todayString) {
             return &folder;
         }
     }
     
-    // 如果不存在，创建今天的文件夹
     TodoFolder todayFolder(todayString);
     m_folders.append(todayFolder);
     
-    // 更新文件夹列表显示
     updateFolderList();
     
-    // 返回新创建的文件夹
     return &m_folders.last();
-}
-
-void MainWindow::onCalendarTodoDeleted(const QString &itemId)
-{
-    for (TodoFolder &folder : m_folders) {
-        if (folder.findItem(itemId)) {
-            folder.removeItem(itemId);
-            saveData();
-            updateFolderList();
-            updateTodoList();
-            updateCalendarWidget();
-            updateDesktopWidget();
-            break;
-        }
-    }
 }
 
 void MainWindow::setupSystemTray()
 {
-    // 检查系统是否支持托盘图标
     if (!QSystemTrayIcon::isSystemTrayAvailable()) {
         QMessageBox::critical(this, "系统托盘", "系统不支持托盘图标功能。");
         return;
     }
     
-    // 创建托盘图标
     m_trayIcon = new QSystemTrayIcon(this);
     QIcon trayIcon(":/icons/app.ico");
     if (trayIcon.isNull()) {
-        // 如果资源图标加载失败，尝试文件路径
         QString iconPath = QDir::currentPath() + "/icons/app.ico";
         trayIcon = QIcon(iconPath);
         if (trayIcon.isNull()) {
-            // 如果文件路径也失败，尝试相对路径
             trayIcon = QIcon("icons/app.ico");
             if (trayIcon.isNull()) {
-                // 如果还是失败，使用默认图标
                 trayIcon = style()->standardIcon(QStyle::SP_ComputerIcon);
             }
         }
@@ -849,71 +1001,156 @@ void MainWindow::setupSystemTray()
     m_trayIcon->setIcon(trayIcon);
     m_trayIcon->setToolTip("Todo List - 待办事项管理");
     
-    // 创建托盘菜单
     m_trayMenu = new QMenu(this);
     
-    // 创建菜单项
     m_showAction = new QAction("显示主窗口", this);
-    m_showAction->setIcon(trayIcon);  // 使用相同的图标
+    m_showAction->setIcon(trayIcon);
     
     m_exitAction = new QAction("退出", this);
     m_exitAction->setIcon(style()->standardIcon(QStyle::SP_DialogCloseButton));
     
-    // 添加菜单项到托盘菜单
     m_trayMenu->addAction(m_showAction);
     m_trayMenu->addSeparator();
     m_trayMenu->addAction(m_exitAction);
     
-    // 设置托盘菜单
     m_trayIcon->setContextMenu(m_trayMenu);
     
-    // 连接信号和槽
     connect(m_trayIcon, &QSystemTrayIcon::activated, this, &MainWindow::onTrayIconActivated);
     connect(m_showAction, &QAction::triggered, this, &MainWindow::onShowFromTray);
     connect(m_exitAction, &QAction::triggered, this, &MainWindow::onExitFromTray);
     
-    // 显示托盘图标
     m_trayIcon->show();
 }
 
 void MainWindow::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason)
 {
     switch (reason) {
-    case QSystemTrayIcon::DoubleClick:
-        onShowFromTray();
-        break;
-    case QSystemTrayIcon::Trigger:
-        // 单击时显示提示信息
-        m_trayIcon->showMessage("Todo List", "应用程序正在后台运行，双击图标显示主窗口", QSystemTrayIcon::Information, 3000);
-        break;
-    default:
-        break;
+        case QSystemTrayIcon::Trigger:
+        case QSystemTrayIcon::DoubleClick:
+            show();
+            activateWindow();
+            raise();
+            break;
+        default:
+            break;
     }
 }
 
 void MainWindow::onShowFromTray()
 {
     show();
-    raise();
     activateWindow();
-    setWindowState(windowState() & ~Qt::WindowMinimized);
+    raise();
 }
 
 void MainWindow::onExitFromTray()
 {
-    // 保存数据后真正退出应用程序
     saveData();
-    QApplication::quit();
+    if (m_desktopWidget) {
+        m_desktopWidget->close();
+    }
+    qApp->quit();
+}
+
+void MainWindow::onImportClicked()
+{
+    QString fileName = QFileDialog::getOpenFileName(this, "导入数据", "", "JSON文件 (*.json)");
+    
+    if (fileName.isEmpty()) {
+        return;
+    }
+    
+    QFile file(fileName);
+    if (!file.open(QIODevice::ReadOnly)) {
+        QMessageBox::critical(this, "错误", "无法打开文件进行读取。");
+        return;
+    }
+    
+    QByteArray data = file.readAll();
+    file.close();
+    
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+    if (!doc.isObject()) {
+        QMessageBox::critical(this, "错误", "文件格式不正确。");
+        return;
+    }
+    
+    QJsonObject root = doc.object();
+    QJsonArray foldersArray = root["folders"].toArray();
+    
+    m_folders.clear();
+    for (const QJsonValue &folderVal : foldersArray) {
+        TodoFolder folder(folderVal.toObject());
+        m_folders.append(folder);
+    }
+    
+    saveData();
+    updateFolderList();
+    updateCalendarWidget();
+    updateTagWidget();
+    updateDesktopWidget();
+    
+    QMessageBox::information(this, "导入成功", "数据已成功导入！");
+}
+
+void MainWindow::onExportClicked()
+{
+    QString fileName = QFileDialog::getSaveFileName(this, "导出数据", "", "JSON文件 (*.json)");
+    
+    if (fileName.isEmpty()) {
+        return;
+    }
+    
+    QJsonObject root;
+    QJsonArray foldersArray;
+    
+    for (const TodoFolder &folder : m_folders) {
+        foldersArray.append(folder.toJson());
+    }
+    
+    root["folders"] = foldersArray;
+    
+    QJsonDocument doc(root);
+    
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly)) {
+        QMessageBox::critical(this, "错误", "无法创建文件进行写入。");
+        return;
+    }
+    
+    file.write(doc.toJson());
+    file.close();
+    
+    QMessageBox::information(this, "导出成功", "数据已成功导出！");
+}
+
+void MainWindow::onExitClicked()
+{
+    saveData();
+    if (m_desktopWidget) {
+        m_desktopWidget->close();
+    }
+    qApp->quit();
+}
+
+void MainWindow::onDesktopWidgetClicked()
+{
+    if (m_desktopWidget) {
+        m_desktopWidget->show();
+        m_desktopWidget->activateWindow();
+    } else {
+        setupDesktopWidget();
+        m_desktopWidget->show();
+    }
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     if (m_trayIcon && m_trayIcon->isVisible()) {
-        // 最小化到托盘而不是退出
         hide();
-        m_trayIcon->showMessage("Todo List", "应用程序已最小化到系统托盘", QSystemTrayIcon::Information, 2000);
         event->ignore();
     } else {
+        saveData();
         event->accept();
     }
 }
