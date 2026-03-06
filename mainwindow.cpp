@@ -8,6 +8,90 @@
 #include <QVBoxLayout>
 #include <QMenu>
 #include <QTimer>
+#include <QStyledItemDelegate>
+#include <QPainter>
+
+class TodoItemDelegate : public QStyledItemDelegate
+{
+public:
+    TodoItemDelegate(QObject *parent = nullptr) : QStyledItemDelegate(parent) {}
+    
+    void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
+    {
+        painter->save();
+        painter->setRenderHint(QPainter::Antialiasing);
+        
+        bool isSelected = option.state & QStyle::State_Selected;
+        if (isSelected) {
+            painter->fillRect(option.rect, QColor(239, 246, 255));
+        }
+        
+        QString text = index.data(Qt::DisplayRole).toString();
+        QStringList lines = text.split('\n');
+        QString titleLine = lines.value(0);
+        QString subLine = lines.value(1, "");
+        
+        QString title;
+        QString date;
+        int tabPos = titleLine.indexOf('\t');
+        if (tabPos > 0) {
+            title = titleLine.left(tabPos);
+            date = titleLine.mid(tabPos + 1);
+        } else {
+            title = titleLine;
+        }
+        
+        bool isCompleted = index.data(Qt::ForegroundRole).isValid() && 
+                          index.data(Qt::ForegroundRole).value<QColor>() == QColor(156, 163, 175);
+        
+        QRect rect = option.rect.adjusted(12, 6, -12, -6);
+        
+        QFont titleFont;
+        titleFont.setPixelSize(14);
+        titleFont.setBold(true);
+        if (isCompleted) {
+            titleFont.setStrikeOut(true);
+        }
+        painter->setFont(titleFont);
+        
+        QColor titleColor = isCompleted ? QColor(156, 163, 175) : QColor(30, 41, 59);
+        painter->setPen(titleColor);
+        
+        QFontMetrics fm(titleFont);
+        int dateWidth = date.isEmpty() ? 0 : fm.horizontalAdvance(date) + 20;
+        int titleWidth = rect.width() - dateWidth - 10;
+        QString elidedTitle = fm.elidedText(title, Qt::ElideRight, titleWidth);
+        painter->drawText(QRect(rect.left(), rect.top(), titleWidth, 22), Qt::AlignLeft | Qt::AlignVCenter, elidedTitle);
+        
+        if (!date.isEmpty()) {
+            QFont dateFont;
+            dateFont.setPixelSize(12);
+            painter->setFont(dateFont);
+            painter->setPen(QColor(100, 116, 139));
+            painter->drawText(QRect(rect.right() - dateWidth + 10, rect.top(), dateWidth, 22), Qt::AlignRight | Qt::AlignVCenter, date);
+        }
+        
+        if (!subLine.isEmpty()) {
+            QFont subFont;
+            subFont.setPixelSize(11);
+            painter->setFont(subFont);
+            painter->setPen(QColor(148, 163, 184));
+            
+            QFontMetrics subFm(subFont);
+            QString elidedSub = subFm.elidedText(subLine, Qt::ElideRight, rect.width());
+            painter->drawText(QRect(rect.left(), rect.top() + 24, rect.width(), 18), Qt::AlignLeft | Qt::AlignVCenter, elidedSub);
+        }
+        
+        painter->restore();
+    }
+    
+    QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override
+    {
+        Q_UNUSED(option)
+        Q_UNUSED(index)
+        return QSize(200, 52);
+    }
+};
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -47,6 +131,8 @@ MainWindow::MainWindow(QWidget *parent)
     updateTagWidget();
     setupSystemTray();
     loadSplitterState();
+    
+    ui->todoListWidget->setItemDelegate(new TodoItemDelegate(this));
     
     if (m_desktopWidget) {
         m_desktopWidget->show();
@@ -607,17 +693,33 @@ void MainWindow::onTodoContextMenu(const QPoint &pos)
     menu.addSeparator();
     QMenu *tagMenu = menu.addMenu("添加标签");
     
-    QStringList commonTags = {"工作", "学习", "生活", "重要", "紧急"};
-    for (const QString &tag : commonTags) {
-        QAction *tagAction = tagMenu->addAction(tag);
-        connect(tagAction, &QAction::triggered, [this, tag]() {
-            if (m_currentItem) {
-                m_currentItem->addTag(tag);
-                updateTodoList();
-                updateTagWidget();
-                saveData();
+    QSet<QString> existingTags;
+    for (const TodoFolder &folder : m_folders) {
+        for (const TodoItem &item : folder.getItems()) {
+            for (const QString &tag : item.getTags()) {
+                existingTags.insert(tag);
             }
-        });
+        }
+    }
+    
+    QStringList sortedTags = existingTags.values();
+    std::sort(sortedTags.begin(), sortedTags.end());
+    
+    if (sortedTags.isEmpty()) {
+        QAction *noTagAction = tagMenu->addAction("(暂无标签)");
+        noTagAction->setEnabled(false);
+    } else {
+        for (const QString &tag : sortedTags) {
+            QAction *tagAction = tagMenu->addAction(tag);
+            connect(tagAction, &QAction::triggered, [this, tag]() {
+                if (m_currentItem) {
+                    m_currentItem->addTag(tag);
+                    updateTodoList();
+                    updateTagWidget();
+                    saveData();
+                }
+            });
+        }
     }
     
     QAction *deleteAction = menu.addAction("删除");
@@ -638,7 +740,6 @@ void MainWindow::onTodoContextMenu(const QPoint &pos)
 void MainWindow::onSaveClicked()
 {
     if (!m_currentItem) {
-        QMessageBox::information(this, "提示", "请先选择一个待办事项。");
         return;
     }
     
@@ -652,8 +753,6 @@ void MainWindow::onSaveClicked()
     updateTagWidget();
     updateDesktopWidget();
     saveData();
-    
-    QMessageBox::information(this, "提示", "保存成功！");
 }
 
 void MainWindow::onDeleteClicked()
@@ -821,7 +920,7 @@ void MainWindow::updateTodoList()
             dateText = item.getPlannedDate().toString("MM-dd");
         }
         
-        QString fullText = displayText + "\n" + subText + "  " + dateText;
+        QString fullText = displayText + "\t" + dateText + "\n" + subText;
         
         QListWidgetItem *listItem = new QListWidgetItem();
         listItem->setText(fullText);
@@ -936,23 +1035,7 @@ void MainWindow::setupDesktopWidget()
     });
     connect(m_desktopWidget, &DesktopWidget::deleteTodoRequested, this, [this](const QString &itemId) {
         try {
-            for (int i = 0; i < m_folders.size(); ++i) {
-                if (m_folders[i].findItem(itemId)) {
-                    m_folders[i].removeItem(itemId);
-                    
-                    if (m_currentItem && m_currentItem->getId() == itemId) {
-                        m_currentItem = nullptr;
-                    }
-                    
-                    saveData();
-                    updateFolderList();
-                    updateTodoList();
-                    updateCalendarWidget();
-                    updateTagWidget();
-                    updateDesktopWidget();
-                    break;
-                }
-            }
+            deleteTodoItem(itemId);
         } catch (...) {
             MessageUtils::showError(this, "错误", "删除待办事项失败");
         }
@@ -985,35 +1068,7 @@ void MainWindow::onDesktopNewTodo(const QString &title)
 void MainWindow::onDesktopTodoToggled(const QString &itemId, bool completed)
 {
     try {
-        bool found = false;
-        QString folderId;
-        
-        for (int i = 0; i < m_folders.size(); ++i) {
-            TodoItem* item = m_folders[i].findItem(itemId);
-            if (item) {
-                item->setCompleted(completed);
-                folderId = m_folders[i].getId();
-                found = true;
-                break;
-            }
-        }
-        
-        if (!found) return;
-        
-        saveData();
-        
-        if (m_currentFolder && m_currentFolder->getId() == folderId) {
-            updateTodoList();
-        }
-        updateFolderList();
-        updateCalendarWidget();
-        updateTagWidget();
-        
-        QTimer::singleShot(0, this, [this]() {
-            if (m_desktopWidget) {
-                m_desktopWidget->updateTodoData(m_folders);
-            }
-        });
+        toggleTodoCompleted(itemId, completed);
     } catch (const std::exception &e) {
         MessageUtils::showError(this, "操作失败", QString("切换完成状态时发生错误: %1").arg(e.what()));
     } catch (...) {
@@ -1082,36 +1137,12 @@ void MainWindow::onCalendarTodoAdded(const QString &title, const QDate &date)
 
 void MainWindow::onCalendarTodoToggled(const QString &itemId, bool completed)
 {
-    for (TodoFolder& folder : m_folders) {
-        TodoItem* item = folder.findItem(itemId);
-        if (item) {
-            item->setCompleted(completed);
-            
-            updateTodoList();
-            updateFolderList();
-            updateCalendarWidget();
-            updateTagWidget();
-            updateDesktopWidget();
-            saveData();
-            return;
-        }
-    }
+    toggleTodoCompleted(itemId, completed);
 }
 
 void MainWindow::onCalendarTodoDeleted(const QString &itemId)
 {
-    for (TodoFolder &folder : m_folders) {
-        if (folder.findItem(itemId)) {
-            folder.removeItem(itemId);
-            saveData();
-            updateFolderList();
-            updateTodoList();
-            updateCalendarWidget();
-            updateTagWidget();
-            updateDesktopWidget();
-            break;
-        }
-    }
+    deleteTodoItem(itemId);
 }
 
 void MainWindow::setupTagWidget()
@@ -1174,6 +1205,69 @@ void MainWindow::updateTagWidget()
     if (m_tagWidget) {
         m_tagWidget->updateData(m_folders);
     }
+}
+
+void MainWindow::refreshAllViews()
+{
+    updateFolderList();
+    updateTodoList();
+    updateCalendarWidget();
+    updateTagWidget();
+    updateDesktopWidget();
+}
+
+TodoItem* MainWindow::findTodoItemById(const QString &itemId, QString &outFolderId)
+{
+    for (int i = 0; i < m_folders.size(); ++i) {
+        TodoItem* item = m_folders[i].findItem(itemId);
+        if (item) {
+            outFolderId = m_folders[i].getId();
+            return item;
+        }
+    }
+    return nullptr;
+}
+
+bool MainWindow::toggleTodoCompleted(const QString &itemId, bool completed)
+{
+    QString folderId;
+    TodoItem* item = findTodoItemById(itemId, folderId);
+    
+    if (!item) {
+        return false;
+    }
+    
+    item->setCompleted(completed);
+    saveData();
+    
+    if (m_currentItem && m_currentItem->getId() == itemId) {
+        m_currentItem = item;
+    }
+    
+    refreshAllViews();
+    
+    return true;
+}
+
+bool MainWindow::deleteTodoItem(const QString &itemId)
+{
+    for (int i = 0; i < m_folders.size(); ++i) {
+        QList<TodoItem> items = m_folders[i].getItems();
+        for (int j = 0; j < items.size(); ++j) {
+            if (items[j].getId() == itemId) {
+                m_folders[i].removeItem(itemId);
+                
+                if (m_currentItem && m_currentItem->getId() == itemId) {
+                    m_currentItem = nullptr;
+                }
+                
+                saveData();
+                refreshAllViews();
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 TodoFolder* MainWindow::findFolderById(const QString &folderId)

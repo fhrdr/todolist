@@ -179,7 +179,8 @@ void TodoItemWidget::paintEvent(QPaintEvent *event)
     }
     
     QFont titleFont;
-    titleFont.setPixelSize(13);
+    titleFont.setPixelSize(15);
+    titleFont.setBold(true);
     if (m_completed) {
         titleFont.setStrikeOut(true);
     }
@@ -245,13 +246,14 @@ void TagWidget::setupUI()
     leftLayout->setSpacing(16);
     
     m_cloudPanel = new QWidget();
-    m_cloudPanel->setStyleSheet("background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;");
+    m_cloudPanel->setStyleSheet("background-color: transparent;");
     m_cloudLayout = new QVBoxLayout(m_cloudPanel);
-    m_cloudLayout->setContentsMargins(20, 16, 20, 16);
-    m_cloudLayout->setSpacing(12);
+    m_cloudLayout->setContentsMargins(0, 0, 0, 0);
+    m_cloudLayout->setSpacing(8);
     
     m_cloudTitle = new QLabel("标签云");
     m_cloudTitle->setStyleSheet("font-size: 14px; font-weight: 600; color: #1e293b;");
+    m_cloudTitle->setFixedHeight(24);
     m_cloudLayout->addWidget(m_cloudTitle);
     
     m_cloudContainer = new QWidget();
@@ -269,8 +271,9 @@ void TagWidget::setupUI()
     
     QWidget *listHeader = new QWidget();
     listHeader->setStyleSheet("background-color: transparent;");
+    listHeader->setFixedHeight(40);
     QHBoxLayout *listHeaderLayout = new QHBoxLayout(listHeader);
-    listHeaderLayout->setContentsMargins(20, 16, 20, 12);
+    listHeaderLayout->setContentsMargins(20, 8, 20, 8);
     
     m_listTitle = new QLabel("标签列表");
     m_listTitle->setStyleSheet("font-size: 14px; font-weight: 600; color: #1e293b;");
@@ -431,7 +434,7 @@ void TagWidget::refreshTodoList()
     while (m_todoListLayout->count() > 1) {
         QLayoutItem *item = m_todoListLayout->takeAt(0);
         if (item->widget()) {
-            delete item->widget();
+            item->widget()->deleteLater();
         }
         delete item;
     }

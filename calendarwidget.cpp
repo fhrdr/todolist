@@ -92,6 +92,12 @@ void CalendarCell::paintEvent(QPaintEvent *event)
     QRect dateRect = getDateRect();
     painter.drawText(dateRect, Qt::AlignCenter, QString::number(m_date.day()));
     
+    QList<QColor> priorityColors = {
+        QColor(59, 130, 246),
+        QColor(245, 158, 11),
+        QColor(239, 68, 68)
+    };
+    
     int maxTodos = qMin(3, m_todos.size());
     for (int i = 0; i < maxTodos; ++i) {
         QRect todoRect = getTodoRect(i);
@@ -99,9 +105,14 @@ void CalendarCell::paintEvent(QPaintEvent *event)
         
         const TodoItem &todo = m_todos[i];
         
-        QColor tagColor(37, 99, 235);
-        if (!todo.getTagColor().isEmpty()) {
+        QColor tagColor;
+        if (todo.isCompleted()) {
+            tagColor = QColor(156, 163, 175);
+        } else if (!todo.getTagColor().isEmpty()) {
             tagColor = QColor(todo.getTagColor());
+        } else {
+            int priority = qBound(0, todo.getPriority(), 2);
+            tagColor = priorityColors[priority];
         }
         
         painter.setPen(Qt::NoPen);
@@ -110,6 +121,9 @@ void CalendarCell::paintEvent(QPaintEvent *event)
         
         QFont todoFont;
         todoFont.setPixelSize(10);
+        if (todo.isCompleted()) {
+            todoFont.setStrikeOut(true);
+        }
         painter.setFont(todoFont);
         painter.setPen(Qt::white);
         
@@ -179,13 +193,7 @@ void CalendarGrid::setupUI()
     m_headerWidget = new QWidget();
     m_headerLayout = new QHBoxLayout(m_headerWidget);
     m_headerLayout->setContentsMargins(0, 0, 0, 0);
-    m_headerLayout->setSpacing(4);
-    
-    m_prevYearBtn = new QPushButton("<<");
-    m_prevYearBtn->setFixedSize(32, 32);
-    m_prevYearBtn->setCursor(Qt::PointingHandCursor);
-    m_prevYearBtn->setToolTip("上一年");
-    m_headerLayout->addWidget(m_prevYearBtn);
+    m_headerLayout->setSpacing(8);
     
     m_prevBtn = new QPushButton("<");
     m_prevBtn->setFixedSize(32, 32);
@@ -203,12 +211,6 @@ void CalendarGrid::setupUI()
     m_nextBtn->setCursor(Qt::PointingHandCursor);
     m_nextBtn->setToolTip("下一月");
     m_headerLayout->addWidget(m_nextBtn);
-    
-    m_nextYearBtn = new QPushButton(">>");
-    m_nextYearBtn->setFixedSize(32, 32);
-    m_nextYearBtn->setCursor(Qt::PointingHandCursor);
-    m_nextYearBtn->setToolTip("下一年");
-    m_headerLayout->addWidget(m_nextYearBtn);
     
     m_mainLayout->addWidget(m_headerWidget);
     
@@ -242,8 +244,6 @@ void CalendarGrid::setupUI()
     
     m_mainLayout->addWidget(m_gridWidget);
     
-    connect(m_prevYearBtn, &QPushButton::clicked, this, &CalendarGrid::onPrevYear);
-    connect(m_nextYearBtn, &QPushButton::clicked, this, &CalendarGrid::onNextYear);
     connect(m_prevBtn, &QPushButton::clicked, this, &CalendarGrid::onPrevMonth);
     connect(m_nextBtn, &QPushButton::clicked, this, &CalendarGrid::onNextMonth);
     
@@ -326,20 +326,6 @@ void CalendarGrid::onNextMonth()
     emit monthChanged(m_year, m_month);
 }
 
-void CalendarGrid::onPrevYear()
-{
-    m_year--;
-    updateCells();
-    emit monthChanged(m_year, m_month);
-}
-
-void CalendarGrid::onNextYear()
-{
-    m_year++;
-    updateCells();
-    emit monthChanged(m_year, m_month);
-}
-
 TodoListItem::TodoListItem(const TodoItem &item, QWidget *parent)
     : QWidget(parent)
     , m_todoId(item.getId())
@@ -399,6 +385,7 @@ void TodoListItem::paintEvent(QPaintEvent *event)
     
     QFont titleFont;
     titleFont.setPixelSize(13);
+    titleFont.setBold(true);
     if (m_completed) {
         titleFont.setStrikeOut(true);
     }
@@ -433,29 +420,7 @@ void CalendarWidget::setupUI()
     m_leftLayout->setContentsMargins(0, 0, 0, 0);
     m_leftLayout->setSpacing(8);
     
-    QWidget *yearMonthPanel = new QWidget();
-    QHBoxLayout *yearMonthLayout = new QHBoxLayout(yearMonthPanel);
-    yearMonthLayout->setContentsMargins(0, 0, 0, 0);
-    yearMonthLayout->setSpacing(8);
-    
-    QPushButton *prevYearBtn = new QPushButton("<<");
-    prevYearBtn->setFixedSize(40, 28);
-    prevYearBtn->setCursor(Qt::PointingHandCursor);
-    yearMonthLayout->addWidget(prevYearBtn);
-    connect(prevYearBtn, &QPushButton::clicked, this, &CalendarWidget::onPrevYear);
-    
     m_calendarGrid = new CalendarGrid();
-    yearMonthLayout->addStretch();
-    yearMonthLayout->addWidget(new QLabel(""));
-    yearMonthLayout->addStretch();
-    
-    QPushButton *nextYearBtn = new QPushButton(">>");
-    nextYearBtn->setFixedSize(40, 28);
-    nextYearBtn->setCursor(Qt::PointingHandCursor);
-    yearMonthLayout->addWidget(nextYearBtn);
-    connect(nextYearBtn, &QPushButton::clicked, this, &CalendarWidget::onNextYear);
-    
-    m_leftLayout->addWidget(yearMonthPanel);
     m_leftLayout->addWidget(m_calendarGrid, 1);
     
     m_mainLayout->addWidget(m_leftPanel, 2);
@@ -465,21 +430,22 @@ void CalendarWidget::setupUI()
     m_rightLayout->setContentsMargins(0, 0, 0, 0);
     m_rightLayout->setSpacing(12);
     
-    m_rightPanel->setStyleSheet("background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px;");
+    m_rightPanel->setStyleSheet("background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;");
     m_rightPanel->setMinimumWidth(280);
     m_rightPanel->setMaximumWidth(320);
     
     QWidget *headerWidget = new QWidget();
+    headerWidget->setStyleSheet("background-color: transparent; border-bottom: 1px solid #f1f5f9;");
     QVBoxLayout *headerLayout = new QVBoxLayout(headerWidget);
-    headerLayout->setContentsMargins(16, 16, 16, 8);
-    headerLayout->setSpacing(4);
+    headerLayout->setContentsMargins(20, 16, 20, 12);
+    headerLayout->setSpacing(6);
     
     m_dateLabel = new QLabel();
-    m_dateLabel->setStyleSheet("font-size: 15px; font-weight: 600; color: #1f2937;");
+    m_dateLabel->setStyleSheet("font-size: 14px; font-weight: 600; color: #1e293b;");
     headerLayout->addWidget(m_dateLabel);
     
     m_countLabel = new QLabel();
-    m_countLabel->setStyleSheet("font-size: 12px; color: #6b7280;");
+    m_countLabel->setStyleSheet("font-size: 12px; color: #64748b;");
     headerLayout->addWidget(m_countLabel);
     
     m_rightLayout->addWidget(headerWidget);
@@ -491,21 +457,29 @@ void CalendarWidget::setupUI()
     m_todoScrollArea->setStyleSheet("QScrollArea { border: none; background-color: transparent; }");
     
     m_todoContainer = new QWidget();
+    m_todoContainer->setStyleSheet("background-color: transparent;");
     m_todoListLayout = new QVBoxLayout(m_todoContainer);
-    m_todoListLayout->setContentsMargins(8, 0, 8, 0);
-    m_todoListLayout->setSpacing(4);
+    m_todoListLayout->setContentsMargins(12, 12, 12, 12);
+    m_todoListLayout->setSpacing(6);
     m_todoListLayout->addStretch();
     
     m_todoScrollArea->setWidget(m_todoContainer);
     m_rightLayout->addWidget(m_todoScrollArea, 1);
     
     m_addPanel = new QWidget();
+    m_addPanel->setStyleSheet("background-color: transparent; border-top: 1px solid #f1f5f9;");
     m_addLayout = new QHBoxLayout(m_addPanel);
-    m_addLayout->setContentsMargins(16, 8, 16, 16);
+    m_addLayout->setContentsMargins(16, 12, 16, 12);
     m_addLayout->setSpacing(8);
     
     m_addLineEdit = new QLineEdit();
     m_addLineEdit->setPlaceholderText("添加待办事项...");
+    m_addLineEdit->setStyleSheet(
+        "QLineEdit { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; "
+        "padding: 8px 12px; color: #334155; font-size: 13px; }"
+        "QLineEdit:focus { border-color: #6366f1; background-color: #ffffff; }"
+        "QLineEdit::placeholder { color: #94a3b8; }"
+    );
     m_addLayout->addWidget(m_addLineEdit, 1);
     
     m_addButton = new QPushButton("添加");
@@ -515,9 +489,14 @@ void CalendarWidget::setupUI()
     m_rightLayout->addWidget(m_addPanel);
     
     QWidget *buttonPanel = new QWidget();
+    buttonPanel->setStyleSheet("background-color: transparent;");
     QHBoxLayout *buttonLayout = new QHBoxLayout(buttonPanel);
     buttonLayout->setContentsMargins(16, 0, 16, 16);
     buttonLayout->setSpacing(8);
+    
+    m_addButton2 = new QPushButton("添加");
+    m_addButton2->setObjectName("newTodoBtn");
+    buttonLayout->addWidget(m_addButton2);
     
     m_toggleButton = new QPushButton("完成");
     m_toggleButton->setObjectName("newTodoBtn");
@@ -528,7 +507,6 @@ void CalendarWidget::setupUI()
     m_deleteButton->setObjectName("deleteBtn");
     m_deleteButton->setEnabled(false);
     buttonLayout->addWidget(m_deleteButton);
-    buttonLayout->addStretch();
     
     m_rightLayout->addWidget(buttonPanel);
     
@@ -545,6 +523,7 @@ void CalendarWidget::setupConnections()
         updateDateLabel();
     });
     connect(m_addButton, &QPushButton::clicked, this, &CalendarWidget::onAddTodo);
+    connect(m_addButton2, &QPushButton::clicked, this, &CalendarWidget::onAddTodo);
     connect(m_deleteButton, &QPushButton::clicked, this, &CalendarWidget::onDeleteTodo);
     connect(m_toggleButton, &QPushButton::clicked, this, &CalendarWidget::onToggleTodo);
 }
@@ -580,7 +559,7 @@ void CalendarWidget::refreshCalendarData()
 void CalendarWidget::refreshTodoList()
 {
     for (TodoListItem *item : m_todoItems) {
-        delete item;
+        item->deleteLater();
     }
     m_todoItems.clear();
     
@@ -686,16 +665,3 @@ void CalendarWidget::onNextMonth()
 {
 }
 
-void CalendarWidget::onPrevYear()
-{
-    int year = m_calendarGrid->getYear() - 1;
-    int month = m_calendarGrid->getMonth();
-    m_calendarGrid->setCurrentMonth(year, month);
-}
-
-void CalendarWidget::onNextYear()
-{
-    int year = m_calendarGrid->getYear() + 1;
-    int month = m_calendarGrid->getMonth();
-    m_calendarGrid->setCurrentMonth(year, month);
-}

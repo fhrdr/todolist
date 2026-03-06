@@ -102,6 +102,11 @@ private:
     void updateCalendarWidget();
     void updateTagWidget();
     void updateTodoTags();
+    void refreshAllViews();
+    
+    bool toggleTodoCompleted(const QString &itemId, bool completed);
+    bool deleteTodoItem(const QString &itemId);
+    TodoItem* findTodoItemById(const QString &itemId, QString &outFolderId);
     
     void initDatabase();
     void loadData();

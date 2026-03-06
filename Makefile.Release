@@ -20,7 +20,7 @@ INCPATH       = -I. -ID:/Qt/qt6/6.8.3/mingw_64/include -ID:/Qt/qt6/6.8.3/mingw_6
 LINKER      =        g++
 LFLAGS        =        -Wl,-s -Wl,-subsystem,windows -mthreads
 LIBS        =        D:\Qt\qt6\6.8.3\mingw_64\lib\libQt6Widgets.a D:\Qt\qt6\6.8.3\mingw_64\lib\libQt6Gui.a D:\Qt\qt6\6.8.3\mingw_64\lib\libQt6Sql.a D:\Qt\qt6\6.8.3\mingw_64\lib\libQt6Core.a release\todolist_resource_res.o -lmingw32 D:\Qt\qt6\6.8.3\mingw_64\lib\libQt6EntryPoint.a -lshell32  
-QMAKE         = D:\Qt\qt6\6.8.3\mingw_64\bin\qmake6.exe
+QMAKE         = D:\Qt\qt6\6.8.3\mingw_64\bin\qmake.exe
 DEL_FILE      = del
 CHK_DIR_EXISTS= if not exist
 MKDIR         = mkdir
@@ -30,8 +30,8 @@ COPY_DIR      = xcopy /s /q /y /i
 INSTALL_FILE  = copy /y
 INSTALL_PROGRAM = copy /y
 INSTALL_DIR   = xcopy /s /q /y /i
-QINSTALL      = D:\Qt\qt6\6.8.3\mingw_64\bin\qmake6.exe -install qinstall
-QINSTALL_PROGRAM = D:\Qt\qt6\6.8.3\mingw_64\bin\qmake6.exe -install qinstall -exe
+QINSTALL      = D:\Qt\qt6\6.8.3\mingw_64\bin\qmake.exe -install qinstall
+QINSTALL_PROGRAM = D:\Qt\qt6\6.8.3\mingw_64\bin\qmake.exe -install qinstall -exe
 DEL_FILE      = del
 SYMLINK       = $(QMAKE) -install ln -f -s
 DEL_DIR       = rmdir
@@ -105,7 +105,7 @@ release/todolist_resource_res.o: todolist_resource.rc
 	windres -i todolist_resource.rc -o release\todolist_resource_res.o --include-dir=. $(DEFINES)
 
 qmake: FORCE
-	@$(QMAKE) -o Makefile.Release todolist.pro
+	@$(QMAKE) -o Makefile.Release todolist.pro -spec win32-g++ "CONFIG+=release"
 
 qmake_all: FORCE
 
@@ -1512,15 +1512,20 @@ release/main.o: main.cpp mainwindow.h \
 		D:/Qt/qt6/6.8.3/mingw_64/include/QtWidgets/QStyle \
 		D:/Qt/qt6/6.8.3/mingw_64/include/QtGui/QPainterPath \
 		D:/Qt/qt6/6.8.3/mingw_64/include/QtGui/qpainterpath.h \
+		fontawesome.h \
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtGui/QIcon \
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtGui/QFont \
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtCore/QFile \
 		D:/Qt/qt6/6.8.3/mingw_64/include/QtWidgets/QApplication \
 		D:/Qt/qt6/6.8.3/mingw_64/include/QtWidgets/qapplication.h \
-		D:/Qt/qt6/6.8.3/mingw_64/include/QtCore/QFile \
-		D:/Qt/qt6/6.8.3/mingw_64/include/QtCore/QTextStream \
 		D:/Qt/qt6/6.8.3/mingw_64/include/QtCore/QDir \
-		D:/Qt/qt6/6.8.3/mingw_64/include/QtGui/QIcon \
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtGui/QFontDatabase \
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtGui/qfontdatabase.h \
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtCore/QTextStream \
 		D:/Qt/qt6/6.8.3/mingw_64/include/QtCore/QSharedMemory \
 		D:/Qt/qt6/6.8.3/mingw_64/include/QtCore/qsharedmemory.h \
-		D:/Qt/qt6/6.8.3/mingw_64/include/QtCore/qtipccommon.h
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtCore/qtipccommon.h \
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtCore/QDebug
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o release\main.o main.cpp
 
 release/mainwindow.o: mainwindow.cpp mainwindow.h \

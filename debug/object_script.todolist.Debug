@@ -1,0 +1,12 @@
+debug/main.o
+debug/mainwindow.o
+debug/todoitem.o
+debug/todofolder.o
+debug/desktopwidget.o
+debug/calendarwidget.o
+debug/tagwidget.o
+debug/qrc_resources.o
+debug/moc_mainwindow.o
+debug/moc_desktopwidget.o
+debug/moc_calendarwidget.o
+debug/moc_tagwidget.o
