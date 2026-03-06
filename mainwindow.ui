@@ -6,24 +6,48 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1200</width>
-    <height>600</height>
+    <width>1280</width>
+    <height>720</height>
    </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>900</width>
+    <height>600</height>
+   </size>
   </property>
   <property name="windowTitle">
    <string>Todo List - 待办事项管理</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="mainLayout">
+    <property name="spacing">
+     <number>0</number>
+    </property>
+    <property name="leftMargin">
+     <number>0</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>0</number>
+    </property>
+    <property name="bottomMargin">
+     <number>0</number>
+    </property>
     <item>
      <widget class="QTabWidget" name="tabWidget">
       <property name="currentIndex">
        <number>0</number>
       </property>
+      <property name="documentMode">
+       <bool>true</bool>
+      </property>
       <widget class="QWidget" name="listTab">
-        <attribute name="title">
-         <string>📋 列表视图</string>
-        </attribute>
+       <attribute name="title">
+        <string>列表视图</string>
+       </attribute>
        <layout class="QHBoxLayout" name="listTabLayout">
         <property name="spacing">
          <number>0</number>
@@ -44,116 +68,82 @@
          <widget class="QWidget" name="leftPanel" native="true">
           <property name="minimumSize">
            <size>
-            <width>250</width>
+            <width>240</width>
             <height>0</height>
            </size>
           </property>
           <property name="maximumSize">
            <size>
-            <width>300</width>
+            <width>280</width>
             <height>16777215</height>
            </size>
           </property>
           <property name="styleSheet">
-            <string notr="true">QWidget#leftPanel {
-     background-color: #fafafa;
-     border-right: 1px solid #e0e0e0;
- }</string>
-           </property>
+           <string notr="true">QWidget#leftPanel {
+    background-color: #ffffff;
+    border-right: 1px solid #e2e8f0;
+}</string>
+          </property>
           <layout class="QVBoxLayout" name="leftLayout">
            <property name="spacing">
-            <number>5</number>
+            <number>12</number>
            </property>
            <property name="leftMargin">
-            <number>10</number>
+            <number>16</number>
            </property>
            <property name="topMargin">
-            <number>10</number>
+            <number>16</number>
            </property>
            <property name="rightMargin">
-            <number>10</number>
+            <number>16</number>
            </property>
            <property name="bottomMargin">
-            <number>10</number>
+            <number>16</number>
            </property>
            <item>
-            <layout class="QHBoxLayout" name="folderHeaderLayout">
+            <widget class="QLabel" name="folderLabel">
+             <property name="text">
+              <string>文件夹</string>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">font-weight: 600; font-size: 14px; color: #1e293b;</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="folderButtonLayout">
+             <property name="spacing">
+              <number>8</number>
+             </property>
              <item>
-              <widget class="QLabel" name="folderLabel">
-                <property name="text">
-                 <string>📁 文件夹</string>
-                </property>
-                <property name="styleSheet">
-                 <string notr="true">font-weight: bold; font-size: 14px; color: #2c3e50; padding: 5px 0;</string>
-                </property>
-               </widget>
+              <widget class="QPushButton" name="newFolderBtn">
+               <property name="text">
+                <string>新建</string>
+               </property>
+               <property name="toolTip">
+                <string>创建新文件夹</string>
+               </property>
+              </widget>
              </item>
              <item>
-              <spacer name="horizontalSpacer">
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
+              <widget class="QPushButton" name="deleteFolderBtn">
+               <property name="text">
+                <string>删除</string>
                </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>40</width>
-                 <height>20</height>
-                </size>
+               <property name="toolTip">
+                <string>删除选中的文件夹</string>
                </property>
-              </spacer>
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+              </widget>
              </item>
-             <item>
-               <widget class="QPushButton" name="newFolderBtn">
-                 <property name="text">
-                  <string>➕ 新建</string>
-                 </property>
-                 <property name="maximumSize">
-                  <size>
-                   <width>80</width>
-                   <height>16777215</height>
-                  </size>
-                 </property>
-                 <property name="toolTip">
-                  <string>创建新文件夹</string>
-                 </property>
-                </widget>
-              </item>
-              <item>
-               <widget class="QPushButton" name="deleteFolderBtn">
-                 <property name="text">
-                  <string>🗑️ 删除</string>
-                 </property>
-                 <property name="maximumSize">
-                  <size>
-                   <width>80</width>
-                   <height>16777215</height>
-                  </size>
-                 </property>
-                 <property name="toolTip">
-                  <string>删除选中的文件夹</string>
-                 </property>
-                 <property name="enabled">
-                  <bool>false</bool>
-                 </property>
-                </widget>
-              </item>
             </layout>
            </item>
            <item>
             <widget class="QListWidget" name="folderListWidget">
-             <property name="styleSheet">
-              <string notr="true">QListWidget {
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    background-color: white;
-}
-QListWidget::item {
-    padding: 8px;
-    border-bottom: 1px solid #eee;
-}
-QListWidget::item:selected {
-    background-color: #e3f2fd;
-    color: #1976d2;
-}</string>
+             <property name="verticalScrollMode">
+              <enum>QAbstractItemView::ScrollPerPixel</enum>
              </property>
             </widget>
            </item>
@@ -164,107 +154,73 @@ QListWidget::item:selected {
          <widget class="QWidget" name="middlePanel" native="true">
           <property name="minimumSize">
            <size>
-            <width>400</width>
+            <width>360</width>
             <height>0</height>
            </size>
           </property>
           <property name="styleSheet">
-            <string notr="true">QWidget#middlePanel {
-     background-color: white;
-     border-right: 1px solid #e0e0e0;
- }</string>
-           </property>
+           <string notr="true">QWidget#middlePanel {
+    background-color: #f8fafc;
+    border-right: 1px solid #e2e8f0;
+}</string>
+          </property>
           <layout class="QVBoxLayout" name="middleLayout">
            <property name="spacing">
-            <number>5</number>
+            <number>12</number>
            </property>
            <property name="leftMargin">
-            <number>10</number>
+            <number>16</number>
            </property>
            <property name="topMargin">
-            <number>10</number>
+            <number>16</number>
            </property>
            <property name="rightMargin">
-            <number>10</number>
+            <number>16</number>
            </property>
            <property name="bottomMargin">
-            <number>10</number>
+            <number>16</number>
            </property>
            <item>
-            <layout class="QHBoxLayout" name="todoHeaderLayout">
-             <item>
-              <widget class="QLabel" name="todoLabel">
-                <property name="text">
-                 <string>📝 待办事项</string>
-                </property>
-                <property name="styleSheet">
-                 <string notr="true">font-weight: bold; font-size: 14px; color: #2c3e50; padding: 5px 0;</string>
-                </property>
-               </widget>
-             </item>
-             <item>
-              <spacer name="horizontalSpacer_2">
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>40</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
+            <widget class="QLabel" name="todoLabel">
+             <property name="text">
+              <string>待办事项</string>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">font-weight: 600; font-size: 14px; color: #1e293b;</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="todoButtonLayout">
+             <property name="spacing">
+              <number>8</number>
+             </property>
              <item>
               <widget class="QPushButton" name="newTodoBtn">
-                <property name="text">
-                 <string>➕ 新建</string>
-                </property>
-                <property name="maximumSize">
-                 <size>
-                  <width>80</width>
-                  <height>16777215</height>
-                 </size>
-                </property>
-                <property name="toolTip">
-                 <string>创建新待办事项</string>
-                </property>
-               </widget>
+               <property name="text">
+                <string>新建</string>
+               </property>
+               <property name="toolTip">
+                <string>创建新待办事项</string>
+               </property>
+              </widget>
              </item>
              <item>
               <widget class="QPushButton" name="syncBtn">
-                <property name="text">
-                 <string>🔄 同步</string>
-                </property>
-                <property name="maximumSize">
-                 <size>
-                  <width>80</width>
-                  <height>16777215</height>
-                 </size>
-                </property>
-                <property name="toolTip">
-                 <string>同步数据</string>
-                </property>
-               </widget>
+               <property name="text">
+                <string>同步</string>
+               </property>
+               <property name="toolTip">
+                <string>同步数据</string>
+               </property>
+              </widget>
              </item>
             </layout>
            </item>
            <item>
             <widget class="QListWidget" name="todoListWidget">
-             <property name="styleSheet">
-              <string notr="true">QListWidget {
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    background-color: white;
-}
-QListWidget::item {
-    padding: 10px;
-    border-bottom: 1px solid #eee;
-}
-QListWidget::item:selected {
-    background-color: #e8f5e8;
-    color: #2e7d32;
-}</string>
+             <property name="verticalScrollMode">
+              <enum>QAbstractItemView::ScrollPerPixel</enum>
              </property>
             </widget>
            </item>
@@ -275,38 +231,38 @@ QListWidget::item:selected {
          <widget class="QWidget" name="rightPanel" native="true">
           <property name="minimumSize">
            <size>
-            <width>350</width>
+            <width>320</width>
             <height>0</height>
            </size>
           </property>
           <property name="styleSheet">
            <string notr="true">QWidget#rightPanel {
-    background-color: #fafafa;
+    background-color: #ffffff;
 }</string>
           </property>
           <layout class="QVBoxLayout" name="rightLayout">
            <property name="spacing">
-            <number>10</number>
+            <number>16</number>
            </property>
            <property name="leftMargin">
-            <number>15</number>
+            <number>20</number>
            </property>
            <property name="topMargin">
-            <number>15</number>
+            <number>20</number>
            </property>
            <property name="rightMargin">
-            <number>15</number>
+            <number>20</number>
            </property>
            <property name="bottomMargin">
-            <number>15</number>
+            <number>20</number>
            </property>
            <item>
             <widget class="QLabel" name="detailLabel">
              <property name="text">
-              <string>📋 详情</string>
+              <string>详情</string>
              </property>
              <property name="styleSheet">
-              <string notr="true">font-weight: bold; font-size: 14px; color: #2c3e50; padding: 5px 0;</string>
+              <string notr="true">font-weight: 600; font-size: 14px; color: #1e293b;</string>
              </property>
             </widget>
            </item>
@@ -317,9 +273,8 @@ QListWidget::item:selected {
              </property>
              <property name="styleSheet">
               <string notr="true">QScrollArea {
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    background-color: white;
+    border: none;
+    background-color: transparent;
 }</string>
              </property>
              <widget class="QWidget" name="detailContent">
@@ -327,27 +282,33 @@ QListWidget::item:selected {
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>316</width>
-                <height>69</height>
+                <width>280</width>
+                <height>500</height>
                </rect>
               </property>
               <layout class="QVBoxLayout" name="detailContentLayout">
                <property name="spacing">
-                <number>10</number>
+                <number>16</number>
+               </property>
+               <property name="leftMargin">
+                <number>0</number>
+               </property>
+               <property name="topMargin">
+                <number>0</number>
+               </property>
+               <property name="rightMargin">
+                <number>0</number>
+               </property>
+               <property name="bottomMargin">
+                <number>0</number>
                </property>
                <item>
                 <widget class="QLabel" name="titleLabel">
                  <property name="text">
-                  <string>📌 标题：</string>
+                  <string>标题</string>
                  </property>
                  <property name="styleSheet">
-                  <string notr="true">font-weight: bold; color: #34495e; margin-bottom: 2px;</string>
-                 </property>
-                 <property name="maximumSize">
-                  <size>
-                   <width>16777215</width>
-                   <height>20</height>
-                  </size>
+                  <string notr="true">font-weight: 500; font-size: 12px; color: #64748b;</string>
                  </property>
                 </widget>
                </item>
@@ -361,21 +322,21 @@ QListWidget::item:selected {
                <item>
                 <widget class="QLabel" name="detailsLabel">
                  <property name="text">
-                  <string>📄 详情：</string>
+                  <string>详情</string>
                  </property>
                  <property name="styleSheet">
-                  <string notr="true">font-weight: bold; color: #34495e; margin-bottom: 2px;</string>
-                 </property>
-                 <property name="maximumSize">
-                  <size>
-                   <width>16777215</width>
-                   <height>20</height>
-                  </size>
+                  <string notr="true">font-weight: 500; font-size: 12px; color: #64748b;</string>
                  </property>
                 </widget>
                </item>
                <item>
                 <widget class="QTextEdit" name="detailsEdit">
+                 <property name="minimumSize">
+                  <size>
+                   <width>0</width>
+                   <height>100</height>
+                  </size>
+                 </property>
                  <property name="placeholderText">
                   <string>请输入详细描述</string>
                  </property>
@@ -384,16 +345,10 @@ QListWidget::item:selected {
                <item>
                 <widget class="QLabel" name="timeLabel">
                  <property name="text">
-                  <string>🕒 创建时间：</string>
+                  <string>创建时间</string>
                  </property>
                  <property name="styleSheet">
-                  <string notr="true">font-weight: bold; color: #34495e; margin-bottom: 2px;</string>
-                 </property>
-                 <property name="maximumSize">
-                  <size>
-                   <width>16777215</width>
-                   <height>20</height>
-                  </size>
+                  <string notr="true">font-weight: 500; font-size: 12px; color: #64748b;</string>
                  </property>
                 </widget>
                </item>
@@ -402,21 +357,18 @@ QListWidget::item:selected {
                  <property name="text">
                   <string>-</string>
                  </property>
+                 <property name="styleSheet">
+                  <string notr="true">color: #334155; font-size: 13px;</string>
+                 </property>
                 </widget>
                </item>
                <item>
                 <widget class="QLabel" name="completedTimeLabel_title">
                  <property name="text">
-                  <string>✅ 完成时间：</string>
+                  <string>完成时间</string>
                  </property>
                  <property name="styleSheet">
-                  <string notr="true">font-weight: bold; color: #34495e; margin-bottom: 2px;</string>
-                 </property>
-                 <property name="maximumSize">
-                  <size>
-                   <width>16777215</width>
-                   <height>20</height>
-                  </size>
+                  <string notr="true">font-weight: 500; font-size: 12px; color: #64748b;</string>
                  </property>
                 </widget>
                </item>
@@ -425,24 +377,27 @@ QListWidget::item:selected {
                  <property name="text">
                   <string>-</string>
                  </property>
+                 <property name="styleSheet">
+                  <string notr="true">color: #334155; font-size: 13px;</string>
+                 </property>
                 </widget>
                </item>
                <item>
                 <widget class="QCheckBox" name="completedCheckBox">
                  <property name="text">
-                  <string>已完成</string>
-                 </property>
-                 <property name="styleSheet">
-                  <string notr="true">font-size: 12px; color: #27ae60;</string>
+                  <string>标记为已完成</string>
                  </property>
                 </widget>
                </item>
                <item>
                 <layout class="QHBoxLayout" name="buttonLayout">
+                 <property name="spacing">
+                  <number>12</number>
+                 </property>
                  <item>
                   <widget class="QPushButton" name="saveBtn">
                    <property name="text">
-                    <string>💾 保存</string>
+                    <string>保存</string>
                    </property>
                    <property name="toolTip">
                     <string>保存当前修改</string>
@@ -452,22 +407,10 @@ QListWidget::item:selected {
                  <item>
                   <widget class="QPushButton" name="deleteBtn">
                    <property name="text">
-                    <string>🗑️ 删除</string>
+                    <string>删除</string>
                    </property>
                    <property name="toolTip">
                     <string>删除当前待办事项</string>
-                   </property>
-                   <property name="styleSheet">
-                    <string notr="true">QPushButton {
-    background-color: #f44336;
-    color: white;
-    border: none;
-    padding: 5px 10px;
-    border-radius: 3px;
-}
-QPushButton:hover {
-    background-color: #d32f2f;
-}</string>
                    </property>
                   </widget>
                  </item>
@@ -496,15 +439,30 @@ QPushButton:hover {
        </layout>
       </widget>
       <widget class="QWidget" name="calendarTab">
-        <attribute name="title">
-         <string>📅 日历视图</string>
-        </attribute>
+       <attribute name="title">
+        <string>日历视图</string>
+       </attribute>
        <layout class="QVBoxLayout" name="calendarTabLayout">
+        <property name="spacing">
+         <number>0</number>
+        </property>
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
         <item>
          <widget class="QWidget" name="calendarContainer" native="true">
           <property name="styleSheet">
            <string notr="true">QWidget#calendarContainer {
-    background-color: #f8f9fa;
+    background-color: #f8fafc;
 }</string>
           </property>
          </widget>
@@ -520,7 +478,7 @@ QPushButton:hover {
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1200</width>
+     <width>1280</width>
      <height>25</height>
     </rect>
    </property>

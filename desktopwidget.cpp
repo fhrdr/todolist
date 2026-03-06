@@ -6,42 +6,30 @@
 #include <QApplication>
 #include <QScreen>
 #include <QSettings>
-#include <QMessageBox>
-#include <QInputDialog>
-#include <QFont>
-#include <QFontMetrics>
+#include <QMenu>
 
 DesktopWidget::DesktopWidget(QWidget *parent)
     : QWidget(parent)
-    , m_trayIcon(nullptr)
     , m_dragging(false)
 {
-    // 初始化m_folders为空列表
     m_folders.clear();
     
     setupUI();
-    setupTrayIcon();
     
-    // 创建刷新定时器（必须在setupConnections之前）
     m_refreshTimer = new QTimer(this);
-    m_refreshTimer->setInterval(60000); // 每分钟刷新一次
+    m_refreshTimer->setInterval(60000);
     
     setupConnections();
     
-    // 设置窗口属性
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
     setAttribute(Qt::WA_TranslucentBackground);
-    setFixedSize(280, 400);
+    setFixedSize(300, 420);
     
-    // 加载窗口位置
     loadWindowPosition();
     
-    // 启动定时器
     m_refreshTimer->start();
     
     applyStyles();
-    
-    // 初始加载
     loadPendingItems();
 }
 
@@ -53,42 +41,44 @@ DesktopWidget::~DesktopWidget()
 void DesktopWidget::setupUI()
 {
     m_mainLayout = new QVBoxLayout(this);
-    m_mainLayout->setContentsMargins(10, 10, 10, 10);
-    m_mainLayout->setSpacing(8);
+    m_mainLayout->setContentsMargins(16, 16, 16, 16);
+    m_mainLayout->setSpacing(12);
     
-    // 标题栏
+    m_headerWidget = new QWidget();
+    m_headerLayout = new QHBoxLayout(m_headerWidget);
+    m_headerLayout->setContentsMargins(0, 0, 0, 0);
+    m_headerLayout->setSpacing(8);
+    
     m_titleLabel = new QLabel("待办事项");
-    m_titleLabel->setAlignment(Qt::AlignCenter);
-    // 调整标题栏样式，设置高度
-    m_titleLabel->setFixedHeight(16);
-    m_titleLabel->setStyleSheet("font-weight: bold; font-size: 14px; color: #333; padding: 0px; margin: 0px;");
-    m_mainLayout->addWidget(m_titleLabel);
+    m_titleLabel->setStyleSheet("font-weight: 600; font-size: 15px; color: #1e293b;");
+    m_headerLayout->addWidget(m_titleLabel);
     
-    // 待办事项列表
+    m_countLabel = new QLabel();
+    m_countLabel->setStyleSheet("font-size: 12px; color: #6366f1; font-weight: 500;");
+    m_headerLayout->addWidget(m_countLabel);
+    
+    m_headerLayout->addStretch();
+    m_mainLayout->addWidget(m_headerWidget);
+    
     m_todoListWidget = new QListWidget();
-    m_todoListWidget->setMaximumHeight(250);
-    // 设置待办事项列表每一列的高度
-    m_todoListWidget->setUniformItemSizes(true);
-    m_todoListWidget->setStyleSheet("QListWidget::item { height: 24px; }");
+    m_todoListWidget->setMinimumHeight(260);
+    m_todoListWidget->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     m_mainLayout->addWidget(m_todoListWidget);
     
-    // 添加新待办事项的布局
-    m_addLayout = new QHBoxLayout();
-    m_addLineEdit = new QLineEdit();
-    m_addLineEdit->setPlaceholderText("快速添加待办事项...");
-    m_addButton = new QPushButton("添加");
-    m_addButton->setMaximumWidth(50);
+    m_addWidget = new QWidget();
+    m_addLayout = new QHBoxLayout(m_addWidget);
+    m_addLayout->setContentsMargins(0, 0, 0, 0);
+    m_addLayout->setSpacing(8);
     
+    m_addLineEdit = new QLineEdit();
+    m_addLineEdit->setPlaceholderText("快速添加...");
     m_addLayout->addWidget(m_addLineEdit);
+    
+    m_addButton = new QPushButton("添加");
+    m_addButton->setFixedWidth(60);
     m_addLayout->addWidget(m_addButton);
-    m_mainLayout->addLayout(m_addLayout);
-}
-
-void DesktopWidget::setupTrayIcon()
-{
-    // 不创建独立的托盘图标，使用主窗口的托盘图标
-    // DesktopWidget 不应该有自己的托盘图标
-    return;
+    
+    m_mainLayout->addWidget(m_addWidget);
 }
 
 void DesktopWidget::setupConnections()
@@ -96,61 +86,33 @@ void DesktopWidget::setupConnections()
     connect(m_addButton, &QPushButton::clicked, this, &DesktopWidget::onAddTodoClicked);
     connect(m_addLineEdit, &QLineEdit::returnPressed, this, &DesktopWidget::onAddTodoClicked);
     connect(m_todoListWidget, &QListWidget::itemClicked, this, &DesktopWidget::onTodoItemClicked);
-    connect(m_todoListWidget, &QListWidget::itemChanged, this, &DesktopWidget::onTodoItemChanged);
     connect(m_refreshTimer, &QTimer::timeout, this, &DesktopWidget::onRefreshTimer);
 }
 
 void DesktopWidget::applyStyles()
 {
-    setStyleSheet(
-        "DesktopWidget {"
-        "    background-color: rgba(255, 255, 255, 240);"
-        "    border: 2px solid #ddd;"
-        "    border-radius: 10px;"
-        "}"
-        "QListWidget {"
-        "    background-color: rgba(255, 255, 255, 200);"
-        "    border: 1px solid #ccc;"
-        "    border-radius: 5px;"
-        "    font-size: 12px;"
-        "}"
-        "QListWidget::item {"
-        "    padding: 5px;"
-        "    border-bottom: 1px solid #eee;"
-        "}"
-        "QListWidget::item:hover {"
-        "    background-color: rgba(230, 247, 255, 150);"
-        "}"
-        "QListWidget::item:selected {"
-        "    background-color: rgba(100, 181, 246, 100);"
-        "}"
-        "QLineEdit {"
-        "    padding: 5px;"
-        "    border: 1px solid #ccc;"
-        "    border-radius: 3px;"
-        "    font-size: 12px;"
-        "}"
-        "QPushButton {"
-        "    padding: 5px 10px;"
-        "    border: 1px solid #ccc;"
-        "    border-radius: 3px;"
-        "    background-color: rgba(245, 245, 245, 200);"
-        "    font-size: 12px;"
-        "}"
-        "QPushButton:hover {"
-        "    background-color: rgba(230, 230, 230, 200);"
-        "}"
-        "QPushButton:pressed {"
-        "    background-color: rgba(200, 200, 200, 200);"
-        "}"
+    QString listStyle = 
+        "QListWidget { border: none; background-color: transparent; }"
+        "QListWidget::item { padding: 10px 12px; border-radius: 6px; margin: 2px 0; }"
+        "QListWidget::item:hover { background-color: rgba(99, 102, 241, 0.08); }"
+        "QListWidget::item:selected { background-color: rgba(99, 102, 241, 0.15); }";
+    
+    m_todoListWidget->setStyleSheet(listStyle);
+    
+    m_addLineEdit->setStyleSheet(
+        "QLineEdit { padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff; }"
+        "QLineEdit:focus { border-color: #6366f1; }"
+    );
+    
+    m_addButton->setStyleSheet(
+        "QPushButton { background-color: #6366f1; color: white; border: none; border-radius: 8px; padding: 10px 16px; font-weight: 500; }"
+        "QPushButton:hover { background-color: #4f46e5; }"
     );
 }
 
 void DesktopWidget::updateTodoData(const QList<TodoFolder> &folders)
 {
-    // 安全检查：确保传入的数据有效
     if (&folders == &m_folders) {
-        // 如果传入的是同一个对象的引用，直接返回避免自赋值
         return;
     }
     
@@ -163,7 +125,6 @@ void DesktopWidget::loadPendingItems()
 {
     m_displayItems.clear();
     
-    // 收集所有未完成的待办事项，最多显示10个
     int count = 0;
     for (const TodoFolder &folder : m_folders) {
         QList<TodoItem> items = folder.getItems();
@@ -183,31 +144,29 @@ void DesktopWidget::updateTodoList()
     
     for (const TodoItem &item : m_displayItems) {
         QListWidgetItem *listItem = new QListWidgetItem();
-        listItem->setText(item.getTitle());
-        listItem->setData(Qt::UserRole, item.getId());
-        listItem->setFlags(listItem->flags() | Qt::ItemIsUserCheckable);
-        listItem->setCheckState(item.isCompleted() ? Qt::Checked : Qt::Unchecked);
         
-        // 设置字体样式
+        QString prefix = item.isCompleted() ? "✓ " : "○ ";
+        listItem->setText(prefix + item.getTitle());
+        listItem->setData(Qt::UserRole, item.getId());
+        
         QFont font = listItem->font();
         if (item.isCompleted()) {
             font.setStrikeOut(true);
-            listItem->setForeground(QColor(128, 128, 128));
+            listItem->setForeground(QColor(100, 116, 139));
         } else {
-            font.setStrikeOut(false);
-            listItem->setForeground(QColor(0, 0, 0));
+            listItem->setForeground(QColor(51, 65, 85));
         }
         listItem->setFont(font);
         
         m_todoListWidget->addItem(listItem);
     }
     
-    // 更新标题显示待办事项数量
     int pendingCount = 0;
     for (const TodoItem &item : m_displayItems) {
         if (!item.isCompleted()) pendingCount++;
     }
-    m_titleLabel->setText(QString("待办事项 (%1)").arg(pendingCount));
+    
+    m_countLabel->setText(QString("(%1)").arg(pendingCount));
 }
 
 void DesktopWidget::refreshDisplay()
@@ -230,19 +189,14 @@ void DesktopWidget::onTodoItemClicked(QListWidgetItem *item)
     if (!item) return;
     
     QString itemId = item->data(Qt::UserRole).toString();
-    bool completed = (item->checkState() == Qt::Checked);
     
-    emit todoItemToggled(itemId, completed);
-}
-
-void DesktopWidget::onTodoItemChanged(QListWidgetItem *item)
-{
-    if (!item) return;
-    
-    QString itemId = item->data(Qt::UserRole).toString();
-    bool completed = (item->checkState() == Qt::Checked);
-    
-    emit todoItemToggled(itemId, completed);
+    for (const TodoItem &todo : m_displayItems) {
+        if (todo.getId() == itemId) {
+            bool newCompleted = !todo.isCompleted();
+            emit todoItemToggled(itemId, newCompleted);
+            break;
+        }
+    }
 }
 
 void DesktopWidget::onRefreshTimer()
@@ -250,43 +204,14 @@ void DesktopWidget::onRefreshTimer()
     refreshDisplay();
 }
 
-void DesktopWidget::onTrayIconActivated(QSystemTrayIcon::ActivationReason reason)
-{
-    switch (reason) {
-    case QSystemTrayIcon::Trigger:
-    case QSystemTrayIcon::DoubleClick:
-        if (isVisible()) {
-            hide();
-        } else {
-            show();
-            raise();
-            activateWindow();
-        }
-        break;
-    default:
-        break;
-    }
-}
-
-void DesktopWidget::onShowMainWindow()
-{
-    emit showMainWindowRequested();
-}
-
-void DesktopWidget::onExitApplication()
-{
-    QApplication::quit();
-}
-
 void DesktopWidget::paintEvent(QPaintEvent *event)
 {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     
-    // 绘制半透明背景
-    painter.setBrush(QBrush(QColor(255, 255, 255, 160)));
-    painter.setPen(QPen(QColor(200, 200, 200), 2));
-    painter.drawRoundedRect(rect().adjusted(1, 1, -1, -1), 10, 10);
+    painter.setBrush(QBrush(QColor(255, 255, 255, 245)));
+    painter.setPen(QPen(QColor(226, 232, 240), 1));
+    painter.drawRoundedRect(rect().adjusted(1, 1, -1, -1), 16, 16);
     
     QWidget::paintEvent(event);
 }
@@ -311,12 +236,16 @@ void DesktopWidget::mouseMoveEvent(QMouseEvent *event)
 void DesktopWidget::contextMenuEvent(QContextMenuEvent *event)
 {
     QMenu contextMenu(this);
+    contextMenu.setStyleSheet(
+        "QMenu { background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px; }"
+        "QMenu::item { padding: 8px 24px; border-radius: 4px; color: #334155; }"
+        "QMenu::item:selected { background-color: #eef2ff; color: #4f46e5; }"
+    );
+    
     contextMenu.addAction("刷新", this, &DesktopWidget::refreshDisplay);
     contextMenu.addSeparator();
-    contextMenu.addAction("打开主窗口", this, &DesktopWidget::onShowMainWindow);
+    contextMenu.addAction("打开主窗口", this, [this]() { emit showMainWindowRequested(); });
     contextMenu.addAction("隐藏小贴士", this, &DesktopWidget::hide);
-    contextMenu.addSeparator();
-    contextMenu.addAction("退出", this, &DesktopWidget::onExitApplication);
     
     contextMenu.exec(event->globalPos());
 }
@@ -324,24 +253,20 @@ void DesktopWidget::contextMenuEvent(QContextMenuEvent *event)
 void DesktopWidget::closeEvent(QCloseEvent *event)
 {
     hide();
-    event->ignore(); // 不真正关闭，只是隐藏
+    event->ignore();
 }
 
 void DesktopWidget::saveWindowPosition()
 {
     QSettings settings;
-    settings.setValue("DesktopWidget/geometry", saveGeometry());
     settings.setValue("DesktopWidget/position", pos());
 }
 
 void DesktopWidget::loadWindowPosition()
 {
     QSettings settings;
-    restoreGeometry(settings.value("DesktopWidget/geometry").toByteArray());
-    
     QPoint savedPos = settings.value("DesktopWidget/position", QPoint(100, 100)).toPoint();
     
-    // 确保窗口在屏幕范围内
     QScreen *screen = QApplication::primaryScreen();
     QRect screenGeometry = screen->availableGeometry();
     

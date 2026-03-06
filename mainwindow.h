@@ -63,7 +63,6 @@ private slots:
     void onCalendarTodoAdded(const QString &title, const QDate &date);
     void onCalendarTodoToggled(const QString &itemId, bool completed);
     void onCalendarTodoDeleted(const QString &itemId);
-    void onCalendarTodoUpdated(const QString &itemId, const TodoItem &item);
     
     // 系统托盘相关槽函数
     void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);

@@ -471,21 +471,17 @@ void MainWindow::onDesktopNewTodo(const QString &title)
 
 void MainWindow::onDesktopTodoToggled(const QString &itemId, bool completed)
 {
-    // 在所有文件夹中查找并更新对应的待办事项
     for (TodoFolder &folder : m_folders) {
-        QList<TodoItem> items = folder.getItems();
-        for (int i = 0; i < items.size(); ++i) {
-            if (items[i].getId() == itemId) {
-                items[i].setCompleted(completed);
-                folder.updateItem(items[i]);
-                
-                // 更新界面
-                updateTodoList();
-                updateFolderList();
-                updateDesktopWidget();
-                saveData();
-                return;
-            }
+        TodoItem* item = folder.findItem(itemId);
+        if (item) {
+            item->setCompleted(completed);
+            
+            updateTodoList();
+            updateFolderList();
+            updateCalendarWidget();
+            updateDesktopWidget();
+            saveData();
+            return;
         }
     }
 }
@@ -510,7 +506,6 @@ void MainWindow::setupCalendarWidget()
     connect(m_calendarWidget, &CalendarWidget::todoItemAdded, this, &MainWindow::onCalendarTodoAdded);
     connect(m_calendarWidget, &CalendarWidget::todoItemToggled, this, &MainWindow::onCalendarTodoToggled);
     connect(m_calendarWidget, &CalendarWidget::todoItemDeleted, this, &MainWindow::onCalendarTodoDeleted);
-    connect(m_calendarWidget, &CalendarWidget::todoItemUpdated, this, &MainWindow::onCalendarTodoUpdated);
 }
 
 void MainWindow::updateCalendarWidget()
@@ -564,22 +559,17 @@ void MainWindow::onCalendarTodoAdded(const QString& title, const QDate& date)
 
 void MainWindow::onCalendarTodoToggled(const QString& itemId, bool completed)
 {
-    // 从日历视图切换待办事项的完成状态
-    for (auto& folder : m_folders) {
-        QList<TodoItem> items = folder.getItems();
-        for (int i = 0; i < items.size(); ++i) {
-            if (items[i].getId() == itemId) {
-                items[i].setCompleted(completed);
-                folder.updateItem(items[i]);
-                
-                // 更新界面
-                updateTodoList();
-                updateFolderList();
-                updateCalendarWidget();
-                updateDesktopWidget();
-                saveData();
-                return;
-            }
+    for (TodoFolder& folder : m_folders) {
+        TodoItem* item = folder.findItem(itemId);
+        if (item) {
+            item->setCompleted(completed);
+            
+            updateTodoList();
+            updateFolderList();
+            updateCalendarWidget();
+            updateDesktopWidget();
+            saveData();
+            return;
         }
     }
 }
@@ -819,29 +809,9 @@ TodoFolder* MainWindow::findOrCreateTodayFolder()
 
 void MainWindow::onCalendarTodoDeleted(const QString &itemId)
 {
-    // 从日历视图删除待办事项
     for (TodoFolder &folder : m_folders) {
         if (folder.findItem(itemId)) {
             folder.removeItem(itemId);
-            // 保存数据并更新界面
-            saveData();
-            updateFolderList();
-            updateTodoList();
-            updateCalendarWidget();
-            updateDesktopWidget();
-            break;
-        }
-    }
-}
-
-void MainWindow::onCalendarTodoUpdated(const QString &itemId, const TodoItem &item)
-{
-    Q_UNUSED(itemId)  // 使用item.getId()来查找，不需要额外的itemId参数
-    // 从日历视图更新待办事项
-    for (TodoFolder &folder : m_folders) {
-        if (folder.findItem(item.getId())) {
-            folder.updateItem(item);
-            // 保存数据并更新界面
             saveData();
             updateFolderList();
             updateTodoList();
