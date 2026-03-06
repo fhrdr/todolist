@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "fontawesome.h"
 
 #include <QApplication>
 #include <QFile>
@@ -7,28 +8,25 @@
 #include <QIcon>
 #include <QSharedMemory>
 #include <QMessageBox>
+#include <QFontDatabase>
+#include <QDebug>
 
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
     
-    // 单实例控制
     QSharedMemory sharedMemory("TodoListApp_SingleInstance");
     if (!sharedMemory.create(1)) {
-        // 如果共享内存已存在，说明程序已经在运行
         QMessageBox::information(nullptr, "Todo List", "程序已经在运行中！");
         return 0;
     }
     
-    // 设置应用程序信息
     a.setApplicationName("Todo List");
     a.setApplicationVersion("1.0");
     a.setOrganizationName("TodoApp");
     
-    // 设置应用程序图标（用于任务栏）
     QIcon appIcon(":/icons/app.ico");
     if (appIcon.isNull()) {
-        // 如果资源图标加载失败，尝试文件路径
         QString iconPath = QDir::currentPath() + "/icons/app.ico";
         appIcon = QIcon(iconPath);
         if (appIcon.isNull()) {
@@ -37,10 +35,21 @@ int main(int argc, char *argv[])
     }
     a.setWindowIcon(appIcon);
     
-    // 加载样式表
+    QString fontPath = QDir::currentPath() + "/fonts/Font Awesome 7 Free-Solid-900.otf";
+    if (QFile::exists(fontPath)) {
+        int fontId = QFontDatabase::addApplicationFont(fontPath);
+        if (fontId >= 0) {
+            QStringList families = QFontDatabase::applicationFontFamilies(fontId);
+            qDebug() << "Font Awesome loaded:" << families;
+        } else {
+            qDebug() << "Failed to load Font Awesome from:" << fontPath;
+        }
+    } else {
+        qDebug() << "Font Awesome file not found:" << fontPath;
+    }
+    
     QFile styleFile(":/styles.qss");
     if (!styleFile.exists()) {
-        // 如果资源文件不存在，尝试从当前目录加载
         styleFile.setFileName("styles.qss");
     }
     

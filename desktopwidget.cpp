@@ -112,10 +112,6 @@ void DesktopWidget::applyStyles()
 
 void DesktopWidget::updateTodoData(const QList<TodoFolder> &folders)
 {
-    if (&folders == &m_folders) {
-        return;
-    }
-    
     m_folders = folders;
     loadPendingItems();
     updateTodoList();
@@ -187,16 +183,7 @@ void DesktopWidget::onAddTodoClicked()
 void DesktopWidget::onTodoItemClicked(QListWidgetItem *item)
 {
     if (!item) return;
-    
-    QString itemId = item->data(Qt::UserRole).toString();
-    
-    for (const TodoItem &todo : m_displayItems) {
-        if (todo.getId() == itemId) {
-            bool newCompleted = !todo.isCompleted();
-            emit todoItemToggled(itemId, newCompleted);
-            break;
-        }
-    }
+    m_todoListWidget->setCurrentItem(item);
 }
 
 void DesktopWidget::onRefreshTimer()
@@ -245,6 +232,19 @@ void DesktopWidget::contextMenuEvent(QContextMenuEvent *event)
     QListWidgetItem *clickedItem = m_todoListWidget->itemAt(m_todoListWidget->mapFromParent(event->pos()));
     if (clickedItem) {
         QString itemId = clickedItem->data(Qt::UserRole).toString();
+        
+        bool isCompleted = false;
+        for (const TodoItem &todo : m_displayItems) {
+            if (todo.getId() == itemId) {
+                isCompleted = todo.isCompleted();
+                break;
+            }
+        }
+        
+        QString toggleText = isCompleted ? "标记为未完成" : "标记为已完成";
+        contextMenu.addAction(toggleText, this, [this, itemId, isCompleted]() {
+            emit todoItemToggled(itemId, !isCompleted);
+        });
         
         contextMenu.addAction("编辑", this, [this, itemId]() {
             emit editTodoRequested(itemId);

@@ -179,11 +179,18 @@ void CalendarGrid::setupUI()
     m_headerWidget = new QWidget();
     m_headerLayout = new QHBoxLayout(m_headerWidget);
     m_headerLayout->setContentsMargins(0, 0, 0, 0);
-    m_headerLayout->setSpacing(8);
+    m_headerLayout->setSpacing(4);
+    
+    m_prevYearBtn = new QPushButton("<<");
+    m_prevYearBtn->setFixedSize(32, 32);
+    m_prevYearBtn->setCursor(Qt::PointingHandCursor);
+    m_prevYearBtn->setToolTip("上一年");
+    m_headerLayout->addWidget(m_prevYearBtn);
     
     m_prevBtn = new QPushButton("<");
     m_prevBtn->setFixedSize(32, 32);
     m_prevBtn->setCursor(Qt::PointingHandCursor);
+    m_prevBtn->setToolTip("上一月");
     m_headerLayout->addWidget(m_prevBtn);
     
     m_monthLabel = new QLabel();
@@ -194,12 +201,19 @@ void CalendarGrid::setupUI()
     m_nextBtn = new QPushButton(">");
     m_nextBtn->setFixedSize(32, 32);
     m_nextBtn->setCursor(Qt::PointingHandCursor);
+    m_nextBtn->setToolTip("下一月");
     m_headerLayout->addWidget(m_nextBtn);
+    
+    m_nextYearBtn = new QPushButton(">>");
+    m_nextYearBtn->setFixedSize(32, 32);
+    m_nextYearBtn->setCursor(Qt::PointingHandCursor);
+    m_nextYearBtn->setToolTip("下一年");
+    m_headerLayout->addWidget(m_nextYearBtn);
     
     m_mainLayout->addWidget(m_headerWidget);
     
     m_weekHeader = new QWidget();
-    m_weekHeader->setStyleSheet("background-color: #f8fafc; border-radius: 6px;");
+    m_weekHeader->setStyleSheet("background-color: #e0e7ff; border-radius: 6px;");
     m_weekHeaderLayout = new QHBoxLayout(m_weekHeader);
     m_weekHeaderLayout->setContentsMargins(4, 8, 4, 8);
     m_weekHeaderLayout->setSpacing(2);
@@ -208,7 +222,7 @@ void CalendarGrid::setupUI()
     for (const QString &day : weekDays) {
         QLabel *label = new QLabel(day);
         label->setAlignment(Qt::AlignCenter);
-        label->setStyleSheet("color: #6b7280; font-size: 12px; font-weight: 600;");
+        label->setStyleSheet("color: #3730a3; font-size: 12px; font-weight: 600;");
         m_weekHeaderLayout->addWidget(label);
     }
     m_mainLayout->addWidget(m_weekHeader);
@@ -228,6 +242,8 @@ void CalendarGrid::setupUI()
     
     m_mainLayout->addWidget(m_gridWidget);
     
+    connect(m_prevYearBtn, &QPushButton::clicked, this, &CalendarGrid::onPrevYear);
+    connect(m_nextYearBtn, &QPushButton::clicked, this, &CalendarGrid::onNextYear);
     connect(m_prevBtn, &QPushButton::clicked, this, &CalendarGrid::onPrevMonth);
     connect(m_nextBtn, &QPushButton::clicked, this, &CalendarGrid::onNextMonth);
     
@@ -306,6 +322,20 @@ void CalendarGrid::onNextMonth()
         m_month = 1;
         m_year++;
     }
+    updateCells();
+    emit monthChanged(m_year, m_month);
+}
+
+void CalendarGrid::onPrevYear()
+{
+    m_year--;
+    updateCells();
+    emit monthChanged(m_year, m_month);
+}
+
+void CalendarGrid::onNextYear()
+{
+    m_year++;
     updateCells();
     emit monthChanged(m_year, m_month);
 }

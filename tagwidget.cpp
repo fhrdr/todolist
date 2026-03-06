@@ -40,17 +40,17 @@ void TagCloudItem::paintEvent(QPaintEvent *event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     
-    QColor bgColor(239, 246, 255);
-    QColor borderColor(191, 219, 254);
-    QColor textColor(30, 64, 175);
+    QColor bgColor(238, 242, 255);
+    QColor borderColor(165, 180, 252);
+    QColor textColor(79, 70, 229);
     
     painter.setPen(Qt::NoPen);
     painter.setBrush(bgColor);
-    painter.drawRoundedRect(rect(), 12, 12);
+    painter.drawRoundedRect(rect(), 16, 16);
     
     painter.setPen(QPen(borderColor, 1));
     painter.setBrush(Qt::NoBrush);
-    painter.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 12, 12);
+    painter.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 16, 16);
     
     QFont font = painter.font();
     int baseSize = 12;
@@ -92,26 +92,26 @@ void TagListItem::paintEvent(QPaintEvent *event)
     
     painter.fillRect(rect(), QColor(255, 255, 255));
     
-    QColor tagColor(37, 99, 235);
+    QColor tagColor(99, 102, 241);
     painter.setPen(Qt::NoPen);
     painter.setBrush(tagColor);
-    painter.drawRoundedRect(12, 10, 6, height() - 20, 3, 3);
+    painter.drawRoundedRect(16, 12, 4, height() - 24, 2, 2);
     
     QFont tagFont;
     tagFont.setPixelSize(13);
     painter.setFont(tagFont);
-    painter.setPen(QColor(31, 41, 55));
-    painter.drawText(QRect(24, 0, width() - 80, height()), Qt::AlignLeft | Qt::AlignVCenter, m_tag);
+    painter.setPen(QColor(30, 41, 59));
+    painter.drawText(QRect(28, 0, width() - 80, height()), Qt::AlignLeft | Qt::AlignVCenter, m_tag);
     
     QFont countFont;
     countFont.setPixelSize(12);
     painter.setFont(countFont);
-    painter.setPen(QColor(107, 114, 128));
+    painter.setPen(QColor(100, 116, 139));
     QString countText = QString("(%1)").arg(m_count);
     painter.drawText(QRect(width() - 60, 0, 40, height()), Qt::AlignRight | Qt::AlignVCenter, countText);
     
     m_deleteRect = QRect(width() - 28, (height() - 16) / 2, 16, 16);
-    painter.setPen(QColor(156, 163, 175));
+    painter.setPen(QColor(148, 163, 184));
     painter.drawText(m_deleteRect, Qt::AlignCenter, "×");
 }
 
@@ -158,10 +158,10 @@ void TodoItemWidget::paintEvent(QPaintEvent *event)
     
     painter.fillRect(rect(), QColor(255, 255, 255));
     
-    QColor checkColor = m_completed ? QColor(22, 163, 74) : QColor(209, 213, 219);
+    QColor checkColor = m_completed ? QColor(34, 197, 94) : QColor(203, 213, 225);
     QColor checkBg = QColor(255, 255, 255);
     
-    QRect checkRect(12, 12, 18, 18);
+    QRect checkRect(16, 14, 18, 18);
     painter.setPen(Qt::NoPen);
     painter.setBrush(checkBg);
     painter.drawRoundedRect(checkRect, 4, 4);
@@ -184,25 +184,25 @@ void TodoItemWidget::paintEvent(QPaintEvent *event)
         titleFont.setStrikeOut(true);
     }
     painter.setFont(titleFont);
-    painter.setPen(m_completed ? QColor(156, 163, 175) : QColor(31, 41, 55));
+    painter.setPen(m_completed ? QColor(148, 163, 184) : QColor(30, 41, 59));
     
     QFontMetrics fm(titleFont);
     QString elidedTitle = fm.elidedText(m_title, Qt::ElideRight, width() - 120);
-    painter.drawText(QRect(40, 8, width() - 120, 20), Qt::AlignLeft | Qt::AlignVCenter, elidedTitle);
+    painter.drawText(QRect(44, 10, width() - 120, 20), Qt::AlignLeft | Qt::AlignVCenter, elidedTitle);
     
     QFont detailFont;
     detailFont.setPixelSize(11);
     painter.setFont(detailFont);
-    painter.setPen(QColor(156, 163, 175));
+    painter.setPen(QColor(148, 163, 184));
     
     QString detailText = m_details.isEmpty() ? QString::fromUtf8("还没有写任何内容呢~") : m_details;
     QString elidedDetail = fm.elidedText(detailText, Qt::ElideRight, width() - 120);
-    painter.drawText(QRect(40, 28, width() - 120, 18), Qt::AlignLeft | Qt::AlignVCenter, elidedDetail);
+    painter.drawText(QRect(44, 30, width() - 120, 18), Qt::AlignLeft | Qt::AlignVCenter, elidedDetail);
     
     QFont infoFont;
     infoFont.setPixelSize(10);
     painter.setFont(infoFont);
-    painter.setPen(QColor(107, 114, 128));
+    painter.setPen(QColor(100, 116, 139));
     
     QString infoText;
     if (m_plannedDate.isValid()) {
@@ -212,7 +212,7 @@ void TodoItemWidget::paintEvent(QPaintEvent *event)
         if (!infoText.isEmpty()) infoText += " · ";
         infoText += m_folderName;
     }
-    painter.drawText(QRect(40, 48, width() - 120, 16), Qt::AlignLeft | Qt::AlignVCenter, infoText);
+    painter.drawText(QRect(44, 50, width() - 120, 16), Qt::AlignLeft | Qt::AlignVCenter, infoText);
     
     if (!m_tagColor.isEmpty()) {
         QColor tagColor(m_tagColor);
@@ -242,36 +242,38 @@ void TagWidget::setupUI()
     QWidget *leftPanel = new QWidget();
     QVBoxLayout *leftLayout = new QVBoxLayout(leftPanel);
     leftLayout->setContentsMargins(0, 0, 0, 0);
-    leftLayout->setSpacing(12);
+    leftLayout->setSpacing(16);
     
     m_cloudPanel = new QWidget();
-    m_cloudPanel->setStyleSheet("background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px;");
+    m_cloudPanel->setStyleSheet("background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;");
     m_cloudLayout = new QVBoxLayout(m_cloudPanel);
-    m_cloudLayout->setContentsMargins(16, 16, 16, 16);
+    m_cloudLayout->setContentsMargins(20, 16, 20, 16);
     m_cloudLayout->setSpacing(12);
     
     m_cloudTitle = new QLabel("标签云");
-    m_cloudTitle->setStyleSheet("font-size: 15px; font-weight: 600; color: #1f2937;");
+    m_cloudTitle->setStyleSheet("font-size: 14px; font-weight: 600; color: #1e293b;");
     m_cloudLayout->addWidget(m_cloudTitle);
     
     m_cloudContainer = new QWidget();
+    m_cloudContainer->setStyleSheet("background-color: transparent;");
     m_cloudFlow = new QFlowLayout(m_cloudContainer, 8, 8, 8);
     m_cloudLayout->addWidget(m_cloudContainer);
     
     leftLayout->addWidget(m_cloudPanel, 1);
     
     m_listPanel = new QWidget();
-    m_listPanel->setStyleSheet("background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px;");
+    m_listPanel->setStyleSheet("background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;");
     m_listLayout = new QVBoxLayout(m_listPanel);
     m_listLayout->setContentsMargins(0, 0, 0, 0);
     m_listLayout->setSpacing(0);
     
     QWidget *listHeader = new QWidget();
+    listHeader->setStyleSheet("background-color: transparent;");
     QHBoxLayout *listHeaderLayout = new QHBoxLayout(listHeader);
-    listHeaderLayout->setContentsMargins(16, 16, 16, 8);
+    listHeaderLayout->setContentsMargins(20, 16, 20, 12);
     
     m_listTitle = new QLabel("标签列表");
-    m_listTitle->setStyleSheet("font-size: 15px; font-weight: 600; color: #1f2937;");
+    m_listTitle->setStyleSheet("font-size: 14px; font-weight: 600; color: #1e293b;");
     listHeaderLayout->addWidget(m_listTitle);
     listHeaderLayout->addStretch();
     m_listLayout->addWidget(listHeader);
@@ -282,21 +284,29 @@ void TagWidget::setupUI()
     m_tagScrollArea->setStyleSheet("QScrollArea { border: none; background-color: transparent; }");
     
     m_tagContainer = new QWidget();
+    m_tagContainer->setStyleSheet("background-color: transparent;");
     m_tagListLayout = new QVBoxLayout(m_tagContainer);
-    m_tagListLayout->setContentsMargins(8, 0, 8, 8);
-    m_tagListLayout->setSpacing(2);
+    m_tagListLayout->setContentsMargins(12, 0, 12, 12);
+    m_tagListLayout->setSpacing(4);
     m_tagListLayout->addStretch();
     
     m_tagScrollArea->setWidget(m_tagContainer);
     m_listLayout->addWidget(m_tagScrollArea, 1);
     
     m_addPanel = new QWidget();
+    m_addPanel->setStyleSheet("background-color: transparent; border-top: 1px solid #f1f5f9;");
     m_addLayout = new QHBoxLayout(m_addPanel);
-    m_addLayout->setContentsMargins(16, 8, 16, 16);
+    m_addLayout->setContentsMargins(16, 12, 16, 12);
     m_addLayout->setSpacing(8);
     
     m_addLineEdit = new QLineEdit();
     m_addLineEdit->setPlaceholderText("新建标签...");
+    m_addLineEdit->setStyleSheet(
+        "QLineEdit { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; "
+        "padding: 8px 12px; color: #334155; font-size: 13px; }"
+        "QLineEdit:focus { border-color: #6366f1; background-color: #ffffff; }"
+        "QLineEdit::placeholder { color: #94a3b8; }"
+    );
     m_addLayout->addWidget(m_addLineEdit, 1);
     
     m_addButton = new QPushButton("添加");
@@ -310,23 +320,24 @@ void TagWidget::setupUI()
     m_mainLayout->addWidget(leftPanel, 1);
     
     m_todoPanel = new QWidget();
-    m_todoPanel->setStyleSheet("background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px;");
+    m_todoPanel->setStyleSheet("background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;");
     m_todoPanel->setMinimumWidth(400);
     QVBoxLayout *todoMainLayout = new QVBoxLayout(m_todoPanel);
     todoMainLayout->setContentsMargins(0, 0, 0, 0);
     todoMainLayout->setSpacing(0);
     
     QWidget *todoHeader = new QWidget();
+    todoHeader->setStyleSheet("background-color: transparent; border-bottom: 1px solid #f1f5f9;");
     QVBoxLayout *todoHeaderLayout = new QVBoxLayout(todoHeader);
-    todoHeaderLayout->setContentsMargins(16, 16, 16, 8);
-    todoHeaderLayout->setSpacing(4);
+    todoHeaderLayout->setContentsMargins(20, 16, 20, 12);
+    todoHeaderLayout->setSpacing(6);
     
     m_todoTitle = new QLabel("待办事项");
-    m_todoTitle->setStyleSheet("font-size: 15px; font-weight: 600; color: #1f2937;");
+    m_todoTitle->setStyleSheet("font-size: 14px; font-weight: 600; color: #1e293b;");
     todoHeaderLayout->addWidget(m_todoTitle);
     
     m_selectedTagLabel = new QLabel("选择一个标签查看相关待办事项");
-    m_selectedTagLabel->setStyleSheet("font-size: 12px; color: #6b7280;");
+    m_selectedTagLabel->setStyleSheet("font-size: 12px; color: #64748b;");
     todoHeaderLayout->addWidget(m_selectedTagLabel);
     
     todoMainLayout->addWidget(todoHeader);
@@ -337,9 +348,10 @@ void TagWidget::setupUI()
     m_todoScrollArea->setStyleSheet("QScrollArea { border: none; background-color: transparent; }");
     
     m_todoContainer = new QWidget();
+    m_todoContainer->setStyleSheet("background-color: transparent;");
     m_todoListLayout = new QVBoxLayout(m_todoContainer);
-    m_todoListLayout->setContentsMargins(8, 0, 8, 8);
-    m_todoListLayout->setSpacing(4);
+    m_todoListLayout->setContentsMargins(12, 12, 12, 12);
+    m_todoListLayout->setSpacing(6);
     m_todoListLayout->addStretch();
     
     m_todoScrollArea->setWidget(m_todoContainer);

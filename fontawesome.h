@@ -19,52 +19,6 @@ public:
         return instance;
     }
     
-    bool initialize()
-    {
-        if (m_initialized) return true;
-        
-        QStringList fontPaths = {
-            QApplication::applicationDirPath() + "/fonts/Font Awesome 7 Free-Solid-900.otf",
-            QApplication::applicationDirPath() + "/fonts/fa-solid-900.ttf",
-            QApplication::applicationDirPath() + "/Font Awesome 7 Free-Solid-900.otf",
-            QApplication::applicationDirPath() + "/fa-solid-900.ttf",
-            "fonts/Font Awesome 7 Free-Solid-900.otf",
-            "fonts/fa-solid-900.ttf"
-        };
-        
-        for (const QString &fontPath : fontPaths) {
-            if (QFile::exists(fontPath)) {
-                int fontId = QFontDatabase::addApplicationFont(fontPath);
-                if (fontId >= 0) {
-                    QStringList families = QFontDatabase::applicationFontFamilies(fontId);
-                    if (!families.isEmpty()) {
-                        m_fontFamily = families.at(0);
-                        m_initialized = true;
-                        return true;
-                    }
-                }
-            }
-        }
-        
-        m_initialized = false;
-        return false;
-    }
-    
-    QFont font(int pixelSize = 14)
-    {
-        if (m_initialized && !m_fontFamily.isEmpty()) {
-            QFont f(m_fontFamily);
-            f.setPixelSize(pixelSize);
-            return f;
-        }
-        return QFont();
-    }
-    
-    QString icon(IconCode code)
-    {
-        return QChar(static_cast<int>(code));
-    }
-    
     enum IconCode {
         Plus = 0xf067,
         Minus = 0xf068,
@@ -145,6 +99,52 @@ public:
         PlusCircle = 0xf055,
         MinusCircle = 0xf056
     };
+    
+    bool initialize()
+    {
+        if (m_initialized) return true;
+        
+        QStringList fontPaths = {
+            QApplication::applicationDirPath() + "/fonts/Font Awesome 7 Free-Solid-900.otf",
+            QApplication::applicationDirPath() + "/fonts/fa-solid-900.ttf",
+            QApplication::applicationDirPath() + "/Font Awesome 7 Free-Solid-900.otf",
+            QApplication::applicationDirPath() + "/fa-solid-900.ttf",
+            "fonts/Font Awesome 7 Free-Solid-900.otf",
+            "fonts/fa-solid-900.ttf"
+        };
+        
+        for (const QString &fontPath : fontPaths) {
+            if (QFile::exists(fontPath)) {
+                int fontId = QFontDatabase::addApplicationFont(fontPath);
+                if (fontId >= 0) {
+                    QStringList families = QFontDatabase::applicationFontFamilies(fontId);
+                    if (!families.isEmpty()) {
+                        m_fontFamily = families.at(0);
+                        m_initialized = true;
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        m_initialized = false;
+        return false;
+    }
+    
+    QFont font(int pixelSize = 14)
+    {
+        if (m_initialized && !m_fontFamily.isEmpty()) {
+            QFont f(m_fontFamily);
+            f.setPixelSize(pixelSize);
+            return f;
+        }
+        return QFont();
+    }
+    
+    QString icon(IconCode code)
+    {
+        return QChar(static_cast<int>(code));
+    }
 
 private:
     FontAwesome() : m_initialized(false) {}

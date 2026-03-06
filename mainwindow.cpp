@@ -7,6 +7,7 @@
 #include <QSqlError>
 #include <QVBoxLayout>
 #include <QMenu>
+#include <QTimer>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -46,6 +47,10 @@ MainWindow::MainWindow(QWidget *parent)
     updateTagWidget();
     setupSystemTray();
     loadSplitterState();
+    
+    if (m_desktopWidget) {
+        m_desktopWidget->show();
+    }
 }
 
 MainWindow::~MainWindow()
@@ -420,10 +425,12 @@ void MainWindow::onFolderSelectionChanged()
     int row = ui->folderListWidget->currentRow();
     if (row >= 0 && row < m_folders.size()) {
         m_currentFolder = &m_folders[row];
+        ui->deleteFolderBtn->setEnabled(true);
         updateTodoList();
         updateDetailPanel();
     } else {
         m_currentFolder = nullptr;
+        ui->deleteFolderBtn->setEnabled(false);
         ui->todoListWidget->clear();
         clearDetailPanel();
     }
@@ -431,26 +438,45 @@ void MainWindow::onFolderSelectionChanged()
 
 void MainWindow::onDeleteFolderClicked()
 {
-    if (!m_currentFolder) {
-        QMessageBox::information(this, "提示", "请先选择一个文件夹。");
-        return;
-    }
-    
-    QMessageBox::StandardButton reply = QMessageBox::question(this, "确认删除", 
-        QString("确定要删除文件夹 \"%1\" 及其所有待办事项吗？").arg(m_currentFolder->getName()),
-        QMessageBox::Yes | QMessageBox::No);
-    
-    if (reply == QMessageBox::Yes) {
-        m_folders.removeOne(*m_currentFolder);
-        m_currentFolder = nullptr;
+    try {
+        if (!m_currentFolder) {
+            MessageUtils::showInfo(this, "提示", "请先选择一个文件夹。");
+            return;
+        }
         
-        updateFolderList();
-        updateCalendarWidget();
-        updateTagWidget();
-        saveData();
+        QString folderName = m_currentFolder->getName();
+        QString folderId = m_currentFolder->getId();
         
-        ui->todoListWidget->clear();
-        clearDetailPanel();
+        if (MessageUtils::showConfirm(this, "确认删除", 
+            QString("确定要删除文件夹 \"%1\" 及其所有待办事项吗？").arg(folderName))) {
+            
+            for (int i = 0; i < m_folders.size(); ++i) {
+                if (m_folders[i].getId() == folderId) {
+                    m_folders.removeAt(i);
+                    break;
+                }
+            }
+            
+            m_currentFolder = nullptr;
+            m_currentItem = nullptr;
+            
+            saveData();
+            updateFolderList();
+            updateCalendarWidget();
+            updateTagWidget();
+            updateDesktopWidget();
+            
+            ui->todoListWidget->clear();
+            clearDetailPanel();
+            
+            if (!m_folders.isEmpty()) {
+                ui->folderListWidget->setCurrentRow(0);
+            }
+        }
+    } catch (const std::exception &e) {
+        MessageUtils::showError(this, "删除失败", QString("删除文件夹时发生错误: %1").arg(e.what()));
+    } catch (...) {
+        MessageUtils::showError(this, "删除失败", "删除文件夹时发生未知错误");
     }
 }
 
@@ -886,37 +912,49 @@ void MainWindow::setupDesktopWidget()
     connect(m_desktopWidget, &DesktopWidget::todoItemToggled, this, &MainWindow::onDesktopTodoToggled);
     connect(m_desktopWidget, &DesktopWidget::showMainWindowRequested, this, &MainWindow::onShowMainWindow);
     connect(m_desktopWidget, &DesktopWidget::editTodoRequested, this, [this](const QString &itemId) {
-        for (int i = 0; i < m_folders.size(); ++i) {
-            TodoItem *item = m_folders[i].findItem(itemId);
-            if (item) {
-                ui->folderListWidget->setCurrentRow(i);
-                QList<TodoItem> items = m_folders[i].getItems();
-                for (int j = 0; j < items.size(); ++j) {
-                    if (items[j].getId() == itemId) {
-                        ui->todoListWidget->setCurrentRow(j);
-                        break;
-                    }
+        try {
+            for (int i = 0; i < m_folders.size(); ++i) {
+                TodoItem *item = m_folders[i].findItem(itemId);
+                if (item) {
+                    m_currentFolder = &m_folders[i];
+                    m_currentItem = item;
+                    
+                    ui->tabWidget->setCurrentIndex(0);
+                    show();
+                    activateWindow();
+                    raise();
+                    
+                    updateFolderList();
+                    updateTodoList();
+                    updateDetailPanel();
+                    break;
                 }
-                ui->tabWidget->setCurrentIndex(0);
-                show();
-                activateWindow();
-                raise();
-                break;
             }
+        } catch (...) {
+            MessageUtils::showError(this, "错误", "打开待办事项失败");
         }
     });
     connect(m_desktopWidget, &DesktopWidget::deleteTodoRequested, this, [this](const QString &itemId) {
-        for (TodoFolder &folder : m_folders) {
-            if (folder.findItem(itemId)) {
-                folder.removeItem(itemId);
-                saveData();
-                updateFolderList();
-                updateTodoList();
-                updateCalendarWidget();
-                updateTagWidget();
-                updateDesktopWidget();
-                break;
+        try {
+            for (int i = 0; i < m_folders.size(); ++i) {
+                if (m_folders[i].findItem(itemId)) {
+                    m_folders[i].removeItem(itemId);
+                    
+                    if (m_currentItem && m_currentItem->getId() == itemId) {
+                        m_currentItem = nullptr;
+                    }
+                    
+                    saveData();
+                    updateFolderList();
+                    updateTodoList();
+                    updateCalendarWidget();
+                    updateTagWidget();
+                    updateDesktopWidget();
+                    break;
+                }
             }
+        } catch (...) {
+            MessageUtils::showError(this, "错误", "删除待办事项失败");
         }
     });
 }
@@ -946,19 +984,40 @@ void MainWindow::onDesktopNewTodo(const QString &title)
 
 void MainWindow::onDesktopTodoToggled(const QString &itemId, bool completed)
 {
-    for (TodoFolder &folder : m_folders) {
-        TodoItem* item = folder.findItem(itemId);
-        if (item) {
-            item->setCompleted(completed);
-            
-            updateTodoList();
-            updateFolderList();
-            updateCalendarWidget();
-            updateTagWidget();
-            updateDesktopWidget();
-            saveData();
-            return;
+    try {
+        bool found = false;
+        QString folderId;
+        
+        for (int i = 0; i < m_folders.size(); ++i) {
+            TodoItem* item = m_folders[i].findItem(itemId);
+            if (item) {
+                item->setCompleted(completed);
+                folderId = m_folders[i].getId();
+                found = true;
+                break;
+            }
         }
+        
+        if (!found) return;
+        
+        saveData();
+        
+        if (m_currentFolder && m_currentFolder->getId() == folderId) {
+            updateTodoList();
+        }
+        updateFolderList();
+        updateCalendarWidget();
+        updateTagWidget();
+        
+        QTimer::singleShot(0, this, [this]() {
+            if (m_desktopWidget) {
+                m_desktopWidget->updateTodoData(m_folders);
+            }
+        });
+    } catch (const std::exception &e) {
+        MessageUtils::showError(this, "操作失败", QString("切换完成状态时发生错误: %1").arg(e.what()));
+    } catch (...) {
+        MessageUtils::showError(this, "操作失败", "切换完成状态时发生未知错误");
     }
 }
 
