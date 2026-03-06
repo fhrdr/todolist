@@ -15,6 +15,8 @@
 #include <QAction>
 #include <QCloseEvent>
 #include <QSqlDatabase>
+#include <QSplitter>
+#include <QSettings>
 #include "todoitem.h"
 #include "todofolder.h"
 #include "desktopwidget.h"
@@ -90,6 +92,7 @@ private:
     QAction* m_exitAction;
     
     QSqlDatabase m_db;
+    QSplitter *m_mainSplitter;
     
     void updateFolderList();
     void updateTodoList();
@@ -113,6 +116,9 @@ private:
     void setupCalendarWidget();
     void setupTagWidget();
     void setupSystemTray();
+    void setupSplitter();
+    void saveSplitterState();
+    void loadSplitterState();
     
     void closeEvent(QCloseEvent *event) override;
 };

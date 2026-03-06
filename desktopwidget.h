@@ -40,6 +40,8 @@ signals:
     void todoItemToggled(const QString &itemId, bool completed);
     void newTodoRequested(const QString &title);
     void showMainWindowRequested();
+    void editTodoRequested(const QString &itemId);
+    void deleteTodoRequested(const QString &itemId);
     
 private:
     void setupUI();

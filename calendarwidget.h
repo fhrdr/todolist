@@ -4,12 +4,16 @@
 #include <QWidget>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QGridLayout>
 #include <QLabel>
 #include <QPushButton>
 #include <QLineEdit>
+#include <QScrollArea>
 #include <QDate>
 #include <QMap>
-#include <QScrollArea>
+#include <QList>
+#include <QPainter>
+#include <QMouseEvent>
 #include "todoitem.h"
 #include "todofolder.h"
 
@@ -58,13 +62,20 @@ public:
     void setTodoData(const QMap<QDate, QList<TodoItem>> &todos);
     void setSelectedDate(const QDate &date);
     QDate getSelectedDate() const { return m_selectedDate; }
+    int getYear() const { return m_year; }
+    int getMonth() const { return m_month; }
     
 signals:
     void dateClicked(const QDate &date);
     void todoClicked(const QString &todoId);
+    void monthChanged(int year, int month);
     
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
+    
+private slots:
+    void onPrevMonth();
+    void onNextMonth();
     
 private:
     void setupUI();
@@ -73,8 +84,8 @@ private:
     QVBoxLayout *m_mainLayout;
     QWidget *m_headerWidget;
     QHBoxLayout *m_headerLayout;
-    QLabel *m_prevBtn;
-    QLabel *m_nextBtn;
+    QPushButton *m_prevBtn;
+    QPushButton *m_nextBtn;
     QLabel *m_monthLabel;
     QWidget *m_weekHeader;
     QHBoxLayout *m_weekHeaderLayout;
@@ -95,13 +106,15 @@ class TodoListItem : public QWidget
 public:
     explicit TodoListItem(const TodoItem &item, QWidget *parent = nullptr);
     QString getTodoId() const { return m_todoId; }
+    void setSelected(bool selected);
     
 signals:
     void clicked(const QString &todoId);
-    void toggled(const QString &todoId, bool completed);
+    void doubleClicked(const QString &todoId);
     
 protected:
     void mousePressEvent(QMouseEvent *event) override;
+    void mouseDoubleClickEvent(QMouseEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
     
 private:
@@ -109,6 +122,7 @@ private:
     QString m_title;
     bool m_completed;
     QString m_tagColor;
+    bool m_selected;
 };
 
 class CalendarWidget : public QWidget
@@ -129,14 +143,21 @@ signals:
 private slots:
     void onDateClicked(const QDate &date);
     void onTodoClicked(const QString &todoId);
+    void onTodoDoubleClicked(const QString &todoId);
     void onAddTodo();
     void onDeleteTodo();
+    void onToggleTodo();
+    void onPrevMonth();
+    void onNextMonth();
+    void onPrevYear();
+    void onNextYear();
     
 private:
     void setupUI();
     void setupConnections();
     void refreshTodoList();
     void refreshCalendarData();
+    void updateDateLabel();
     
     QHBoxLayout *m_mainLayout;
     
@@ -151,18 +172,18 @@ private:
     QScrollArea *m_todoScrollArea;
     QWidget *m_todoContainer;
     QVBoxLayout *m_todoListLayout;
-    
-    QWidget *m_addPanel;
-    QHBoxLayout *m_addLayout;
     QLineEdit *m_addLineEdit;
     QPushButton *m_addButton;
     QPushButton *m_deleteButton;
+    QPushButton *m_toggleButton;
+    QWidget *m_addPanel;
+    QHBoxLayout *m_addLayout;
     
     QList<TodoFolder> m_folders;
     QDate m_currentDate;
     QString m_selectedTodoId;
-    
     QMap<QDate, QList<TodoItem>> m_dateToTodos;
+    QList<TodoListItem*> m_todoItems;
 };
 
 #endif // CALENDARWIDGET_H

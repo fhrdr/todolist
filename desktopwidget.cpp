@@ -242,6 +242,19 @@ void DesktopWidget::contextMenuEvent(QContextMenuEvent *event)
         "QMenu::item:selected { background-color: #eef2ff; color: #4f46e5; }"
     );
     
+    QListWidgetItem *clickedItem = m_todoListWidget->itemAt(m_todoListWidget->mapFromParent(event->pos()));
+    if (clickedItem) {
+        QString itemId = clickedItem->data(Qt::UserRole).toString();
+        
+        contextMenu.addAction("编辑", this, [this, itemId]() {
+            emit editTodoRequested(itemId);
+        });
+        contextMenu.addAction("删除", this, [this, itemId]() {
+            emit deleteTodoRequested(itemId);
+        });
+        contextMenu.addSeparator();
+    }
+    
     contextMenu.addAction("刷新", this, &DesktopWidget::refreshDisplay);
     contextMenu.addSeparator();
     contextMenu.addAction("打开主窗口", this, [this]() { emit showMainWindowRequested(); });

@@ -3,7 +3,7 @@
 #include <QMouseEvent>
 #include <QFontMetrics>
 #include <QScrollBar>
-#include <QMessageBox>
+#include <QStyle>
 
 CalendarCell::CalendarCell(QWidget *parent)
     : QWidget(parent)
@@ -13,7 +13,7 @@ CalendarCell::CalendarCell(QWidget *parent)
     , m_pressed(false)
     , m_clickedTodoIndex(-1)
 {
-    setMinimumSize(90, 80);
+    setMinimumSize(80, 80);
     setCursor(Qt::PointingHandCursor);
 }
 
@@ -54,8 +54,12 @@ QRect CalendarCell::getDateRect() const
 
 QRect CalendarCell::getTodoRect(int index) const
 {
-    int top = 26 + index * 16;
-    return QRect(4, top, width() - 8, 14);
+    int todoHeight = 16;
+    int todoTop = 26 + index * (todoHeight + 2);
+    if (todoTop + todoHeight > height() - 4) {
+        return QRect();
+    }
+    return QRect(4, todoTop, width() - 8, todoHeight);
 }
 
 void CalendarCell::paintEvent(QPaintEvent *event)
@@ -64,38 +68,38 @@ void CalendarCell::paintEvent(QPaintEvent *event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     
-    QColor bgColor = m_otherMonth ? QColor(250, 250, 250) : QColor(255, 255, 255);
-    if (m_selected) {
-        bgColor = QColor(239, 246, 255);
+    QColor bgColor = m_selected ? QColor(239, 246, 255) : QColor(255, 255, 255);
+    if (m_otherMonth) {
+        bgColor = QColor(249, 250, 251);
     }
     painter.fillRect(rect(), bgColor);
     
     if (m_selected) {
         painter.setPen(QPen(QColor(37, 99, 235), 2));
-        painter.drawRoundedRect(rect().adjusted(1, 1, -1, -1), 4, 4);
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRoundedRect(rect().adjusted(1, 1, -1, -1), 6, 6);
     }
+    
+    QFont dateFont;
+    dateFont.setPixelSize(12);
+    dateFont.setBold(m_today);
+    painter.setFont(dateFont);
+    
+    QColor dateColor = m_otherMonth ? QColor(156, 163, 175) : 
+                       m_today ? QColor(37, 99, 235) : QColor(55, 65, 81);
+    painter.setPen(dateColor);
     
     QRect dateRect = getDateRect();
-    QColor dateColor = m_otherMonth ? QColor(156, 163, 175) : QColor(55, 65, 81);
-    if (m_today) {
-        dateColor = QColor(37, 99, 235);
-    }
-    
-    QFont dateFont = painter.font();
-    if (m_today) {
-        dateFont.setBold(true);
-    }
-    dateFont.setPixelSize(13);
-    painter.setFont(dateFont);
-    painter.setPen(dateColor);
     painter.drawText(dateRect, Qt::AlignCenter, QString::number(m_date.day()));
     
-    int maxTodos = qMin(m_todos.size(), 3);
+    int maxTodos = qMin(3, m_todos.size());
     for (int i = 0; i < maxTodos; ++i) {
         QRect todoRect = getTodoRect(i);
+        if (todoRect.isEmpty()) break;
+        
         const TodoItem &todo = m_todos[i];
         
-        QColor tagColor = QColor(37, 99, 235);
+        QColor tagColor(37, 99, 235);
         if (!todo.getTagColor().isEmpty()) {
             tagColor = QColor(todo.getTagColor());
         }
@@ -110,33 +114,35 @@ void CalendarCell::paintEvent(QPaintEvent *event)
         painter.setPen(Qt::white);
         
         QFontMetrics fm(todoFont);
-        QString text = fm.elidedText(todo.getTitle(), Qt::ElideRight, todoRect.width() - 8);
-        painter.drawText(todoRect.adjusted(4, 0, -4, 0), Qt::AlignLeft | Qt::AlignVCenter, text);
+        QString text = fm.elidedText(todo.getTitle(), Qt::ElideRight, todoRect.width() - 6);
+        painter.drawText(todoRect.adjusted(3, 0, -3, 0), Qt::AlignLeft | Qt::AlignVCenter, text);
     }
     
     if (m_todos.size() > 3) {
-        QRect moreRect = getTodoRect(3);
         QFont moreFont;
-        moreFont.setPixelSize(10);
+        moreFont.setPixelSize(9);
         painter.setFont(moreFont);
         painter.setPen(QColor(107, 114, 128));
-        painter.drawText(moreRect, Qt::AlignLeft | Qt::AlignVCenter, 
-                        QString("+%1").arg(m_todos.size() - 3));
+        QString moreText = QString("+%1").arg(m_todos.size() - 3);
+        QRect moreRect = getTodoRect(3);
+        if (!moreRect.isEmpty()) {
+            painter.drawText(moreRect, Qt::AlignLeft | Qt::AlignVCenter, moreText);
+        }
     }
 }
 
 void CalendarCell::mousePressEvent(QMouseEvent *event)
 {
     m_pressed = true;
+    m_clickedTodoIndex = -1;
     
-    int todoCount = qMin(m_todos.size(), 3);
-    for (int i = 0; i < todoCount; ++i) {
-        if (getTodoRect(i).contains(event->pos())) {
+    for (int i = 0; i < qMin(3, m_todos.size()); ++i) {
+        QRect todoRect = getTodoRect(i);
+        if (todoRect.contains(event->pos())) {
             m_clickedTodoIndex = i;
-            return;
+            break;
         }
     }
-    m_clickedTodoIndex = -1;
     update();
 }
 
@@ -175,11 +181,9 @@ void CalendarGrid::setupUI()
     m_headerLayout->setContentsMargins(0, 0, 0, 0);
     m_headerLayout->setSpacing(8);
     
-    m_prevBtn = new QLabel();
-    m_prevBtn->setText("<");
-    m_prevBtn->setStyleSheet("color: #6b7280; font-size: 16px; font-weight: bold; padding: 4px 8px;");
+    m_prevBtn = new QPushButton("<");
+    m_prevBtn->setFixedSize(32, 32);
     m_prevBtn->setCursor(Qt::PointingHandCursor);
-    m_prevBtn->installEventFilter(this);
     m_headerLayout->addWidget(m_prevBtn);
     
     m_monthLabel = new QLabel();
@@ -187,25 +191,24 @@ void CalendarGrid::setupUI()
     m_monthLabel->setAlignment(Qt::AlignCenter);
     m_headerLayout->addWidget(m_monthLabel, 1);
     
-    m_nextBtn = new QLabel();
-    m_nextBtn->setText(">");
-    m_nextBtn->setStyleSheet("color: #6b7280; font-size: 16px; font-weight: bold; padding: 4px 8px;");
+    m_nextBtn = new QPushButton(">");
+    m_nextBtn->setFixedSize(32, 32);
     m_nextBtn->setCursor(Qt::PointingHandCursor);
-    m_nextBtn->installEventFilter(this);
     m_headerLayout->addWidget(m_nextBtn);
     
     m_mainLayout->addWidget(m_headerWidget);
     
     m_weekHeader = new QWidget();
+    m_weekHeader->setStyleSheet("background-color: #f8fafc; border-radius: 6px;");
     m_weekHeaderLayout = new QHBoxLayout(m_weekHeader);
-    m_weekHeaderLayout->setContentsMargins(0, 0, 0, 0);
+    m_weekHeaderLayout->setContentsMargins(4, 8, 4, 8);
     m_weekHeaderLayout->setSpacing(2);
     
     QStringList weekDays = {"一", "二", "三", "四", "五", "六", "日"};
     for (const QString &day : weekDays) {
         QLabel *label = new QLabel(day);
         label->setAlignment(Qt::AlignCenter);
-        label->setStyleSheet("color: #6b7280; font-size: 12px; font-weight: 500; padding: 4px;");
+        label->setStyleSheet("color: #6b7280; font-size: 12px; font-weight: 600;");
         m_weekHeaderLayout->addWidget(label);
     }
     m_mainLayout->addWidget(m_weekHeader);
@@ -224,31 +227,38 @@ void CalendarGrid::setupUI()
     }
     
     m_mainLayout->addWidget(m_gridWidget);
+    
+    connect(m_prevBtn, &QPushButton::clicked, this, &CalendarGrid::onPrevMonth);
+    connect(m_nextBtn, &QPushButton::clicked, this, &CalendarGrid::onNextMonth);
+    
     updateCells();
 }
 
 bool CalendarGrid::eventFilter(QObject *watched, QEvent *event)
 {
-    if (event->type() == QEvent::MouseButtonRelease) {
-        if (watched == m_prevBtn) {
-            m_month--;
-            if (m_month < 1) {
-                m_month = 12;
-                m_year--;
-            }
-            updateCells();
-            return true;
-        } else if (watched == m_nextBtn) {
-            m_month++;
-            if (m_month > 12) {
-                m_month = 1;
-                m_year++;
-            }
-            updateCells();
-            return true;
-        }
-    }
-    return QWidget::eventFilter(watched, event);
+    Q_UNUSED(watched)
+    Q_UNUSED(event)
+    return false;
+}
+
+void CalendarGrid::setCurrentMonth(int year, int month)
+{
+    m_year = year;
+    m_month = month;
+    updateCells();
+    emit monthChanged(year, month);
+}
+
+void CalendarGrid::setTodoData(const QMap<QDate, QList<TodoItem>> &todos)
+{
+    m_todoData = todos;
+    updateCells();
+}
+
+void CalendarGrid::setSelectedDate(const QDate &date)
+{
+    m_selectedDate = date;
+    updateCells();
 }
 
 void CalendarGrid::updateCells()
@@ -270,35 +280,34 @@ void CalendarGrid::updateCells()
         cell->setSelected(cellDate == m_selectedDate);
         cell->setToday(cellDate == today);
         
+        QList<TodoItem> cellTodos;
         if (m_todoData.contains(cellDate)) {
-            cell->setTodos(m_todoData[cellDate]);
-        } else {
-            cell->setTodos(QList<TodoItem>());
+            cellTodos = m_todoData[cellDate];
         }
+        cell->setTodos(cellTodos);
     }
 }
 
-void CalendarGrid::setCurrentMonth(int year, int month)
+void CalendarGrid::onPrevMonth()
 {
-    m_year = year;
-    m_month = month;
-    updateCells();
-}
-
-void CalendarGrid::setTodoData(const QMap<QDate, QList<TodoItem>> &todos)
-{
-    m_todoData = todos;
-    updateCells();
-}
-
-void CalendarGrid::setSelectedDate(const QDate &date)
-{
-    m_selectedDate = date;
-    if (date.year() != m_year || date.month() != m_month) {
-        m_year = date.year();
-        m_month = date.month();
+    m_month--;
+    if (m_month < 1) {
+        m_month = 12;
+        m_year--;
     }
     updateCells();
+    emit monthChanged(m_year, m_month);
+}
+
+void CalendarGrid::onNextMonth()
+{
+    m_month++;
+    if (m_month > 12) {
+        m_month = 1;
+        m_year++;
+    }
+    updateCells();
+    emit monthChanged(m_year, m_month);
 }
 
 TodoListItem::TodoListItem(const TodoItem &item, QWidget *parent)
@@ -307,9 +316,16 @@ TodoListItem::TodoListItem(const TodoItem &item, QWidget *parent)
     , m_title(item.getTitle())
     , m_completed(item.isCompleted())
     , m_tagColor(item.getTagColor())
+    , m_selected(false)
 {
     setMinimumHeight(48);
     setCursor(Qt::PointingHandCursor);
+}
+
+void TodoListItem::setSelected(bool selected)
+{
+    m_selected = selected;
+    update();
 }
 
 void TodoListItem::mousePressEvent(QMouseEvent *event)
@@ -319,23 +335,37 @@ void TodoListItem::mousePressEvent(QMouseEvent *event)
     }
 }
 
+void TodoListItem::mouseDoubleClickEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton) {
+        emit doubleClicked(m_todoId);
+    }
+}
+
 void TodoListItem::paintEvent(QPaintEvent *event)
 {
     Q_UNUSED(event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     
-    QColor bgColor = QColor(255, 255, 255);
+    QColor bgColor = m_selected ? QColor(239, 246, 255) : QColor(255, 255, 255);
     painter.setPen(Qt::NoPen);
     painter.setBrush(bgColor);
     painter.drawRoundedRect(rect().adjusted(4, 2, -4, -2), 6, 6);
+    
+    if (m_selected) {
+        painter.setPen(QPen(QColor(37, 99, 235), 1));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRoundedRect(rect().adjusted(4, 2, -4, -2), 6, 6);
+    }
     
     QColor tagColor = QColor(37, 99, 235);
     if (!m_tagColor.isEmpty()) {
         tagColor = QColor(m_tagColor);
     }
     painter.setBrush(tagColor);
-    painter.drawRoundedRect(8, 8, 4, height() - 16, 2, 2);
+    painter.setPen(Qt::NoPen);
+    painter.drawRoundedRect(12, 10, 4, height() - 20, 2, 2);
     
     QFont titleFont;
     titleFont.setPixelSize(13);
@@ -347,7 +377,7 @@ void TodoListItem::paintEvent(QPaintEvent *event)
     
     QFontMetrics fm(titleFont);
     QString elidedTitle = fm.elidedText(m_title, Qt::ElideRight, width() - 24);
-    painter.drawText(QRect(20, 0, width() - 28, height()), Qt::AlignLeft | Qt::AlignVCenter, elidedTitle);
+    painter.drawText(QRect(24, 0, width() - 32, height()), Qt::AlignLeft | Qt::AlignVCenter, elidedTitle);
 }
 
 CalendarWidget::CalendarWidget(QWidget *parent)
@@ -373,11 +403,29 @@ void CalendarWidget::setupUI()
     m_leftLayout->setContentsMargins(0, 0, 0, 0);
     m_leftLayout->setSpacing(8);
     
-    QLabel *calendarTitle = new QLabel("日历视图");
-    calendarTitle->setStyleSheet("font-size: 16px; font-weight: 600; color: #1f2937;");
-    m_leftLayout->addWidget(calendarTitle);
+    QWidget *yearMonthPanel = new QWidget();
+    QHBoxLayout *yearMonthLayout = new QHBoxLayout(yearMonthPanel);
+    yearMonthLayout->setContentsMargins(0, 0, 0, 0);
+    yearMonthLayout->setSpacing(8);
+    
+    QPushButton *prevYearBtn = new QPushButton("<<");
+    prevYearBtn->setFixedSize(40, 28);
+    prevYearBtn->setCursor(Qt::PointingHandCursor);
+    yearMonthLayout->addWidget(prevYearBtn);
+    connect(prevYearBtn, &QPushButton::clicked, this, &CalendarWidget::onPrevYear);
     
     m_calendarGrid = new CalendarGrid();
+    yearMonthLayout->addStretch();
+    yearMonthLayout->addWidget(new QLabel(""));
+    yearMonthLayout->addStretch();
+    
+    QPushButton *nextYearBtn = new QPushButton(">>");
+    nextYearBtn->setFixedSize(40, 28);
+    nextYearBtn->setCursor(Qt::PointingHandCursor);
+    yearMonthLayout->addWidget(nextYearBtn);
+    connect(nextYearBtn, &QPushButton::clicked, this, &CalendarWidget::onNextYear);
+    
+    m_leftLayout->addWidget(yearMonthPanel);
     m_leftLayout->addWidget(m_calendarGrid, 1);
     
     m_mainLayout->addWidget(m_leftPanel, 2);
@@ -441,7 +489,12 @@ void CalendarWidget::setupUI()
     buttonLayout->setContentsMargins(16, 0, 16, 16);
     buttonLayout->setSpacing(8);
     
-    m_deleteButton = new QPushButton("删除选中");
+    m_toggleButton = new QPushButton("完成");
+    m_toggleButton->setObjectName("newTodoBtn");
+    m_toggleButton->setEnabled(false);
+    buttonLayout->addWidget(m_toggleButton);
+    
+    m_deleteButton = new QPushButton("删除");
     m_deleteButton->setObjectName("deleteBtn");
     m_deleteButton->setEnabled(false);
     buttonLayout->addWidget(m_deleteButton);
@@ -451,15 +504,24 @@ void CalendarWidget::setupUI()
     
     m_mainLayout->addWidget(m_rightPanel);
     
-    m_dateLabel->setText(m_currentDate.toString("yyyy年MM月dd日 dddd"));
+    updateDateLabel();
 }
 
 void CalendarWidget::setupConnections()
 {
     connect(m_calendarGrid, &CalendarGrid::dateClicked, this, &CalendarWidget::onDateClicked);
     connect(m_calendarGrid, &CalendarGrid::todoClicked, this, &CalendarWidget::onTodoClicked);
+    connect(m_calendarGrid, &CalendarGrid::monthChanged, [this](int, int) {
+        updateDateLabel();
+    });
     connect(m_addButton, &QPushButton::clicked, this, &CalendarWidget::onAddTodo);
     connect(m_deleteButton, &QPushButton::clicked, this, &CalendarWidget::onDeleteTodo);
+    connect(m_toggleButton, &QPushButton::clicked, this, &CalendarWidget::onToggleTodo);
+}
+
+void CalendarWidget::updateDateLabel()
+{
+    m_dateLabel->setText(m_currentDate.toString("yyyy年MM月dd日 dddd"));
 }
 
 void CalendarWidget::updateTodoData(const QList<TodoFolder> &folders)
@@ -487,13 +549,10 @@ void CalendarWidget::refreshCalendarData()
 
 void CalendarWidget::refreshTodoList()
 {
-    while (m_todoListLayout->count() > 1) {
-        QLayoutItem *item = m_todoListLayout->takeAt(0);
-        if (item->widget()) {
-            delete item->widget();
-        }
+    for (TodoListItem *item : m_todoItems) {
         delete item;
     }
+    m_todoItems.clear();
     
     QList<TodoItem> todos;
     if (m_dateToTodos.contains(m_currentDate)) {
@@ -512,7 +571,9 @@ void CalendarWidget::refreshTodoList()
     for (const TodoItem &todo : todos) {
         TodoListItem *item = new TodoListItem(todo);
         connect(item, &TodoListItem::clicked, this, &CalendarWidget::onTodoClicked);
+        connect(item, &TodoListItem::doubleClicked, this, &CalendarWidget::onTodoDoubleClicked);
         m_todoListLayout->insertWidget(m_todoListLayout->count() - 1, item);
+        m_todoItems.append(item);
     }
 }
 
@@ -520,25 +581,27 @@ void CalendarWidget::onDateClicked(const QDate &date)
 {
     m_currentDate = date;
     m_calendarGrid->setSelectedDate(date);
-    m_dateLabel->setText(date.toString("yyyy年MM月dd日 dddd"));
+    updateDateLabel();
     refreshTodoList();
     m_selectedTodoId.clear();
     m_deleteButton->setEnabled(false);
+    m_toggleButton->setEnabled(false);
 }
 
 void CalendarWidget::onTodoClicked(const QString &todoId)
 {
     m_selectedTodoId = todoId;
     m_deleteButton->setEnabled(true);
+    m_toggleButton->setEnabled(true);
     
-    for (const TodoFolder &folder : m_folders) {
-        TodoItem* item = const_cast<TodoFolder&>(folder).findItem(todoId);
-        if (item) {
-            bool newCompleted = !item->isCompleted();
-            emit todoItemToggled(todoId, newCompleted);
-            break;
-        }
+    for (TodoListItem *item : m_todoItems) {
+        item->setSelected(item->getTodoId() == todoId);
     }
+}
+
+void CalendarWidget::onTodoDoubleClicked(const QString &todoId)
+{
+    Q_UNUSED(todoId)
 }
 
 void CalendarWidget::onAddTodo()
@@ -561,4 +624,48 @@ void CalendarWidget::onDeleteTodo()
     emit todoItemDeleted(m_selectedTodoId);
     m_selectedTodoId.clear();
     m_deleteButton->setEnabled(false);
+    m_toggleButton->setEnabled(false);
+}
+
+void CalendarWidget::onToggleTodo()
+{
+    if (m_selectedTodoId.isEmpty()) {
+        return;
+    }
+    
+    for (const TodoFolder &folder : m_folders) {
+        const TodoItem *item = nullptr;
+        for (const TodoItem &i : folder.getItems()) {
+            if (i.getId() == m_selectedTodoId) {
+                item = &i;
+                break;
+            }
+        }
+        if (item) {
+            emit todoItemToggled(m_selectedTodoId, !item->isCompleted());
+            break;
+        }
+    }
+}
+
+void CalendarWidget::onPrevMonth()
+{
+}
+
+void CalendarWidget::onNextMonth()
+{
+}
+
+void CalendarWidget::onPrevYear()
+{
+    int year = m_calendarGrid->getYear() - 1;
+    int month = m_calendarGrid->getMonth();
+    m_calendarGrid->setCurrentMonth(year, month);
+}
+
+void CalendarWidget::onNextYear()
+{
+    int year = m_calendarGrid->getYear() + 1;
+    int month = m_calendarGrid->getMonth();
+    m_calendarGrid->setCurrentMonth(year, month);
 }

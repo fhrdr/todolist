@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "messageutils.h"
 #include <QStandardPaths>
 #include <QDir>
 #include <QSqlQuery>
@@ -18,6 +19,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_trayMenu(nullptr)
     , m_showAction(nullptr)
     , m_exitAction(nullptr)
+    , m_mainSplitter(nullptr)
 {
     ui->setupUi(this);
     
@@ -36,16 +38,19 @@ MainWindow::MainWindow(QWidget *parent)
     loadData();
     updateFolderList();
     setupConnections();
+    setupSplitter();
     setupDesktopWidget();
     setupCalendarWidget();
     setupTagWidget();
     updateCalendarWidget();
     updateTagWidget();
     setupSystemTray();
+    loadSplitterState();
 }
 
 MainWindow::~MainWindow()
 {
+    saveSplitterState();
     saveData();
     if (m_desktopWidget) {
         m_desktopWidget->close();
@@ -59,56 +64,83 @@ MainWindow::~MainWindow()
 
 void MainWindow::initDatabase()
 {
-    QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir dir(dataPath);
-    if (!dir.exists()) {
-        dir.mkpath(".");
+    try {
+        QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        QDir dir(dataPath);
+        if (!dir.exists()) {
+            if (!dir.mkpath(".")) {
+                MessageUtils::showError(this, "初始化失败", "无法创建数据目录");
+                return;
+            }
+        }
+        
+        QString dbPath = dataPath + "/todolist.db";
+        
+        if (QSqlDatabase::contains("qt_sql_default_connection")) {
+            m_db = QSqlDatabase::database("qt_sql_default_connection");
+        } else {
+            m_db = QSqlDatabase::addDatabase("QSQLITE");
+        }
+        m_db.setDatabaseName(dbPath);
+        
+        if (!m_db.open()) {
+            MessageUtils::showError(this, "数据库错误", "无法打开数据库: " + m_db.lastError().text());
+            return;
+        }
+        
+        QSqlQuery query;
+        
+        if (!query.exec("CREATE TABLE IF NOT EXISTS folders ("
+                   "id TEXT PRIMARY KEY, "
+                   "name TEXT NOT NULL, "
+                   "createdTime TEXT, "
+                   "isPinned INTEGER DEFAULT 0, "
+                   "color TEXT DEFAULT '#2563eb')")) {
+            MessageUtils::showError(this, "数据库错误", "创建文件夹表失败: " + query.lastError().text());
+            return;
+        }
+        
+        if (!query.exec("CREATE TABLE IF NOT EXISTS items ("
+                   "id TEXT PRIMARY KEY, "
+                   "title TEXT NOT NULL, "
+                   "details TEXT, "
+                   "createdTime TEXT, "
+                   "completedTime TEXT, "
+                   "updatedTime TEXT, "
+                   "isCompleted INTEGER DEFAULT 0, "
+                   "folderId TEXT, "
+                   "plannedDate TEXT, "
+                   "dueDate TEXT, "
+                   "priority INTEGER DEFAULT 0, "
+                   "tagColor TEXT DEFAULT '#2563eb', "
+                   "isPinned INTEGER DEFAULT 0, "
+                   "FOREIGN KEY(folderId) REFERENCES folders(id))")) {
+            MessageUtils::showError(this, "数据库错误", "创建事项表失败: " + query.lastError().text());
+            return;
+        }
+        
+        if (!query.exec("CREATE TABLE IF NOT EXISTS tags ("
+                   "id TEXT PRIMARY KEY, "
+                   "name TEXT NOT NULL UNIQUE, "
+                   "color TEXT DEFAULT '#2563eb')")) {
+            MessageUtils::showError(this, "数据库错误", "创建标签表失败: " + query.lastError().text());
+            return;
+        }
+        
+        if (!query.exec("CREATE TABLE IF NOT EXISTS item_tags ("
+                   "itemId TEXT, "
+                   "tagId TEXT, "
+                   "PRIMARY KEY(itemId, tagId), "
+                   "FOREIGN KEY(itemId) REFERENCES items(id), "
+                   "FOREIGN KEY(tagId) REFERENCES tags(id))")) {
+            MessageUtils::showError(this, "数据库错误", "创建标签关联表失败: " + query.lastError().text());
+            return;
+        }
+    } catch (const std::exception &e) {
+        MessageUtils::showError(this, "初始化异常", QString("数据库初始化发生异常: %1").arg(e.what()));
+    } catch (...) {
+        MessageUtils::showError(this, "初始化异常", "数据库初始化发生未知异常");
     }
-    
-    QString dbPath = dataPath + "/todolist.db";
-    m_db = QSqlDatabase::addDatabase("QSQLITE");
-    m_db.setDatabaseName(dbPath);
-    
-    if (!m_db.open()) {
-        QMessageBox::critical(this, "数据库错误", "无法打开数据库: " + m_db.lastError().text());
-        return;
-    }
-    
-    QSqlQuery query;
-    query.exec("CREATE TABLE IF NOT EXISTS folders ("
-               "id TEXT PRIMARY KEY, "
-               "name TEXT NOT NULL, "
-               "createdTime TEXT, "
-               "isPinned INTEGER DEFAULT 0, "
-               "color TEXT DEFAULT '#2563eb')");
-    
-    query.exec("CREATE TABLE IF NOT EXISTS items ("
-               "id TEXT PRIMARY KEY, "
-               "title TEXT NOT NULL, "
-               "details TEXT, "
-               "createdTime TEXT, "
-               "completedTime TEXT, "
-               "updatedTime TEXT, "
-               "isCompleted INTEGER DEFAULT 0, "
-               "folderId TEXT, "
-               "plannedDate TEXT, "
-               "dueDate TEXT, "
-               "priority INTEGER DEFAULT 0, "
-               "tagColor TEXT DEFAULT '#2563eb', "
-               "isPinned INTEGER DEFAULT 0, "
-               "FOREIGN KEY(folderId) REFERENCES folders(id))");
-    
-    query.exec("CREATE TABLE IF NOT EXISTS tags ("
-               "id TEXT PRIMARY KEY, "
-               "name TEXT NOT NULL UNIQUE, "
-               "color TEXT DEFAULT '#2563eb')");
-    
-    query.exec("CREATE TABLE IF NOT EXISTS item_tags ("
-               "itemId TEXT, "
-               "tagId TEXT, "
-               "PRIMARY KEY(itemId, tagId), "
-               "FOREIGN KEY(itemId) REFERENCES items(id), "
-               "FOREIGN KEY(tagId) REFERENCES tags(id))");
 }
 
 void MainWindow::migrateFromJson()
@@ -177,111 +209,155 @@ void MainWindow::migrateFromJson()
 
 void MainWindow::loadData()
 {
-    m_folders.clear();
-    
-    QSqlQuery folderQuery("SELECT id, name, createdTime, isPinned, color FROM folders ORDER BY isPinned DESC, createdTime DESC");
-    
-    while (folderQuery.next()) {
-        TodoFolder folder;
-        folder.setId(folderQuery.value(0).toString());
-        folder.setName(folderQuery.value(1).toString());
-        folder.setCreatedTime(QDateTime::fromString(folderQuery.value(2).toString(), Qt::ISODate));
-        folder.setPinned(folderQuery.value(3).toInt() == 1);
-        folder.setColor(folderQuery.value(4).toString());
-        
-        QSqlQuery itemQuery;
-        itemQuery.prepare("SELECT id, title, details, createdTime, completedTime, updatedTime, isCompleted, folderId, plannedDate, dueDate, priority, tagColor, isPinned FROM items WHERE folderId = ? ORDER BY isPinned DESC, createdTime DESC");
-        itemQuery.addBindValue(folder.getId());
-        itemQuery.exec();
-        
-        while (itemQuery.next()) {
-            TodoItem item;
-            item.setId(itemQuery.value(0).toString());
-            item.setTitle(itemQuery.value(1).toString());
-            item.setDetails(itemQuery.value(2).toString());
-            item.setCreatedTime(QDateTime::fromString(itemQuery.value(3).toString(), Qt::ISODate));
-            item.setCompletedTime(QDateTime::fromString(itemQuery.value(4).toString(), Qt::ISODate));
-            item.setUpdatedTime(QDateTime::fromString(itemQuery.value(5).toString(), Qt::ISODate));
-            item.setCompleted(itemQuery.value(6).toInt() == 1);
-            item.setFolderId(itemQuery.value(7).toString());
-            item.setPlannedDate(QDate::fromString(itemQuery.value(8).toString(), Qt::ISODate));
-            item.setDueDate(QDate::fromString(itemQuery.value(9).toString(), Qt::ISODate));
-            item.setPriority(itemQuery.value(10).toInt());
-            item.setTagColor(itemQuery.value(11).toString());
-            item.setPinned(itemQuery.value(12).toInt() == 1);
-            
-            QSqlQuery tagQuery;
-            tagQuery.prepare("SELECT t.name FROM tags t JOIN item_tags it ON t.id = it.tagId WHERE it.itemId = ?");
-            tagQuery.addBindValue(item.getId());
-            tagQuery.exec();
-            
-            QStringList tags;
-            while (tagQuery.next()) {
-                tags.append(tagQuery.value(0).toString());
+    try {
+        if (!m_db.isOpen()) {
+            if (!m_db.open()) {
+                MessageUtils::showError(this, "数据库错误", "无法打开数据库加载数据");
+                return;
             }
-            item.setTags(tags);
-            
-            folder.addItem(item);
         }
         
-        m_folders.append(folder);
-    }
-    
-    if (m_folders.isEmpty()) {
-        TodoFolder defaultFolder("默认文件夹");
-        m_folders.append(defaultFolder);
+        m_folders.clear();
         
-        TodoItem sampleItem("欢迎使用Todo List", "这是一个示例待办事项，您可以编辑或删除它。");
-        m_folders[0].addItem(sampleItem);
+        QSqlQuery folderQuery;
+        if (!folderQuery.exec("SELECT id, name, createdTime, isPinned, color FROM folders ORDER BY isPinned DESC, createdTime DESC")) {
+            MessageUtils::showError(this, "加载错误", "加载文件夹失败: " + folderQuery.lastError().text());
+            return;
+        }
+        
+        while (folderQuery.next()) {
+            TodoFolder folder;
+            folder.setId(folderQuery.value(0).toString());
+            folder.setName(folderQuery.value(1).toString());
+            folder.setCreatedTime(QDateTime::fromString(folderQuery.value(2).toString(), Qt::ISODate));
+            folder.setPinned(folderQuery.value(3).toInt() == 1);
+            folder.setColor(folderQuery.value(4).toString());
+            
+            QSqlQuery itemQuery;
+            itemQuery.prepare("SELECT id, title, details, createdTime, completedTime, updatedTime, isCompleted, folderId, plannedDate, dueDate, priority, tagColor, isPinned FROM items WHERE folderId = ? ORDER BY isPinned DESC, createdTime DESC");
+            itemQuery.addBindValue(folder.getId());
+            if (!itemQuery.exec()) {
+                continue;
+            }
+            
+            while (itemQuery.next()) {
+                TodoItem item;
+                item.setId(itemQuery.value(0).toString());
+                item.setTitle(itemQuery.value(1).toString());
+                item.setDetails(itemQuery.value(2).toString());
+                item.setCreatedTime(QDateTime::fromString(itemQuery.value(3).toString(), Qt::ISODate));
+                item.setCompletedTime(QDateTime::fromString(itemQuery.value(4).toString(), Qt::ISODate));
+                item.setUpdatedTime(QDateTime::fromString(itemQuery.value(5).toString(), Qt::ISODate));
+                item.setCompleted(itemQuery.value(6).toInt() == 1);
+                item.setFolderId(itemQuery.value(7).toString());
+                item.setPlannedDate(QDate::fromString(itemQuery.value(8).toString(), Qt::ISODate));
+                item.setDueDate(QDate::fromString(itemQuery.value(9).toString(), Qt::ISODate));
+                item.setPriority(itemQuery.value(10).toInt());
+                item.setTagColor(itemQuery.value(11).toString());
+                item.setPinned(itemQuery.value(12).toInt() == 1);
+                
+                QSqlQuery tagQuery;
+                tagQuery.prepare("SELECT t.name FROM tags t JOIN item_tags it ON t.id = it.tagId WHERE it.itemId = ?");
+                tagQuery.addBindValue(item.getId());
+                if (tagQuery.exec()) {
+                    QStringList tags;
+                    while (tagQuery.next()) {
+                        tags.append(tagQuery.value(0).toString());
+                    }
+                    item.setTags(tags);
+                }
+                
+                folder.addItem(item);
+            }
+            
+            m_folders.append(folder);
+        }
+        
+        if (m_folders.isEmpty()) {
+            TodoFolder defaultFolder("默认文件夹");
+            m_folders.append(defaultFolder);
+            
+            TodoItem sampleItem("欢迎使用Todo List", "这是一个示例待办事项，您可以编辑或删除它。");
+            m_folders[0].addItem(sampleItem);
+        }
+    } catch (const std::exception &e) {
+        MessageUtils::showError(this, "加载异常", QString("加载数据发生异常: %1").arg(e.what()));
+    } catch (...) {
+        MessageUtils::showError(this, "加载异常", "加载数据发生未知异常");
     }
 }
 
 void MainWindow::saveData()
 {
-    QSqlQuery query;
-    
-    query.exec("DELETE FROM item_tags");
-    query.exec("DELETE FROM items");
-    query.exec("DELETE FROM folders");
-    
-    for (const TodoFolder &folder : m_folders) {
-        query.prepare("INSERT INTO folders (id, name, createdTime, isPinned, color) VALUES (?, ?, ?, ?, ?)");
-        query.addBindValue(folder.getId());
-        query.addBindValue(folder.getName());
-        query.addBindValue(folder.getCreatedTime().toString(Qt::ISODate));
-        query.addBindValue(folder.isPinned() ? 1 : 0);
-        query.addBindValue(folder.getColor());
-        query.exec();
-        
-        for (const TodoItem &item : folder.getItems()) {
-            query.prepare("INSERT INTO items (id, title, details, createdTime, completedTime, updatedTime, isCompleted, folderId, plannedDate, dueDate, priority, tagColor, isPinned) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            query.addBindValue(item.getId());
-            query.addBindValue(item.getTitle());
-            query.addBindValue(item.getDetails());
-            query.addBindValue(item.getCreatedTime().toString(Qt::ISODate));
-            query.addBindValue(item.getCompletedTime().toString(Qt::ISODate));
-            query.addBindValue(item.getUpdatedTime().toString(Qt::ISODate));
-            query.addBindValue(item.isCompleted() ? 1 : 0);
-            query.addBindValue(folder.getId());
-            query.addBindValue(item.getPlannedDate().toString(Qt::ISODate));
-            query.addBindValue(item.getDueDate().toString(Qt::ISODate));
-            query.addBindValue(item.getPriority());
-            query.addBindValue(item.getTagColor());
-            query.addBindValue(item.isPinned() ? 1 : 0);
-            query.exec();
-            
-            for (const QString &tag : item.getTags()) {
-                query.prepare("INSERT OR IGNORE INTO tags (id, name) VALUES (?, ?)");
-                query.addBindValue(QUuid::createUuid().toString(QUuid::WithoutBraces));
-                query.addBindValue(tag);
-                query.exec();
-                
-                query.prepare("INSERT INTO item_tags (itemId, tagId) SELECT ?, id FROM tags WHERE name = ?");
-                query.addBindValue(item.getId());
-                query.addBindValue(tag);
-                query.exec();
+    try {
+        if (!m_db.isOpen()) {
+            if (!m_db.open()) {
+                MessageUtils::showError(this, "保存错误", "无法打开数据库保存数据");
+                return;
             }
         }
+        
+        QSqlQuery query;
+        
+        if (!query.exec("DELETE FROM item_tags")) {
+            qWarning() << "清除item_tags失败:" << query.lastError().text();
+        }
+        if (!query.exec("DELETE FROM items")) {
+            qWarning() << "清除items失败:" << query.lastError().text();
+        }
+        if (!query.exec("DELETE FROM folders")) {
+            qWarning() << "清除folders失败:" << query.lastError().text();
+        }
+        
+        for (const TodoFolder &folder : m_folders) {
+            query.prepare("INSERT INTO folders (id, name, createdTime, isPinned, color) VALUES (?, ?, ?, ?, ?)");
+            query.addBindValue(folder.getId());
+            query.addBindValue(folder.getName());
+            query.addBindValue(folder.getCreatedTime().toString(Qt::ISODate));
+            query.addBindValue(folder.isPinned() ? 1 : 0);
+            query.addBindValue(folder.getColor());
+            if (!query.exec()) {
+                qWarning() << "插入文件夹失败:" << query.lastError().text();
+                continue;
+            }
+            
+            for (const TodoItem &item : folder.getItems()) {
+                query.prepare("INSERT INTO items (id, title, details, createdTime, completedTime, updatedTime, isCompleted, folderId, plannedDate, dueDate, priority, tagColor, isPinned) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                query.addBindValue(item.getId());
+                query.addBindValue(item.getTitle());
+                query.addBindValue(item.getDetails());
+                query.addBindValue(item.getCreatedTime().toString(Qt::ISODate));
+                query.addBindValue(item.getCompletedTime().toString(Qt::ISODate));
+                query.addBindValue(item.getUpdatedTime().toString(Qt::ISODate));
+                query.addBindValue(item.isCompleted() ? 1 : 0);
+                query.addBindValue(folder.getId());
+                query.addBindValue(item.getPlannedDate().toString(Qt::ISODate));
+                query.addBindValue(item.getDueDate().toString(Qt::ISODate));
+                query.addBindValue(item.getPriority());
+                query.addBindValue(item.getTagColor());
+                query.addBindValue(item.isPinned() ? 1 : 0);
+                if (!query.exec()) {
+                    qWarning() << "插入事项失败:" << query.lastError().text();
+                    continue;
+                }
+                
+                for (const QString &tag : item.getTags()) {
+                    query.prepare("INSERT OR IGNORE INTO tags (id, name) VALUES (?, ?)");
+                    query.addBindValue(QUuid::createUuid().toString(QUuid::WithoutBraces));
+                    query.addBindValue(tag);
+                    query.exec();
+                    
+                    query.prepare("INSERT INTO item_tags (itemId, tagId) SELECT ?, id FROM tags WHERE name = ?");
+                    query.addBindValue(item.getId());
+                    query.addBindValue(tag);
+                    query.exec();
+                }
+            }
+        }
+    } catch (const std::exception &e) {
+        MessageUtils::showError(this, "保存异常", QString("保存数据发生异常: %1").arg(e.what()));
+    } catch (...) {
+        MessageUtils::showError(this, "保存异常", "保存数据发生未知异常");
     }
 }
 
@@ -312,18 +388,30 @@ void MainWindow::setupConnections()
 
 void MainWindow::onNewFolderClicked()
 {
-    bool ok;
-    QString folderName = QInputDialog::getText(this, "新建文件夹", "请输入文件夹名称:", QLineEdit::Normal, "新建文件夹", &ok);
-    
-    if (ok && !folderName.isEmpty()) {
-        TodoFolder newFolder(folderName);
-        m_folders.append(newFolder);
-        updateFolderList();
-        updateCalendarWidget();
-        updateTagWidget();
-        saveData();
+    try {
+        bool ok;
+        QString folderName = QInputDialog::getText(this, "新建文件夹", "请输入文件夹名称:", QLineEdit::Normal, "新建文件夹", &ok);
         
-        ui->folderListWidget->setCurrentRow(m_folders.size() - 1);
+        if (ok && !folderName.isEmpty()) {
+            TodoFolder newFolder(folderName);
+            m_folders.append(newFolder);
+            
+            saveData();
+            updateFolderList();
+            updateCalendarWidget();
+            updateTagWidget();
+            
+            for (int i = 0; i < m_folders.size(); ++i) {
+                if (m_folders[i].getId() == newFolder.getId()) {
+                    ui->folderListWidget->setCurrentRow(i);
+                    break;
+                }
+            }
+        }
+    } catch (const std::exception &e) {
+        MessageUtils::showError(this, "创建失败", QString("创建文件夹时发生错误: %1").arg(e.what()));
+    } catch (...) {
+        MessageUtils::showError(this, "创建失败", "创建文件夹时发生未知错误");
     }
 }
 
@@ -416,27 +504,40 @@ void MainWindow::onFolderContextMenu(const QPoint &pos)
 
 void MainWindow::onNewTodoClicked()
 {
-    if (!m_currentFolder) {
-        QMessageBox::information(this, "提示", "请先选择一个文件夹。");
-        return;
-    }
-    
-    bool ok;
-    QString title = QInputDialog::getText(this, "新建待办事项", "请输入待办事项标题:", QLineEdit::Normal, "", &ok);
-    
-    if (ok && !title.isEmpty()) {
-        TodoItem newItem(title);
-        newItem.setPlannedDate(QDate::currentDate());
-        m_currentFolder->addItem(newItem);
+    try {
+        if (!m_currentFolder) {
+            MessageUtils::showInfo(this, "提示", "请先选择一个文件夹。");
+            return;
+        }
         
-        updateTodoList();
-        updateFolderList();
-        updateCalendarWidget();
-        updateTagWidget();
-        updateDesktopWidget();
-        saveData();
+        bool ok;
+        QString title = QInputDialog::getText(this, "新建待办事项", "请输入待办事项标题:", QLineEdit::Normal, "", &ok);
         
-        ui->todoListWidget->setCurrentRow(m_currentFolder->getItemCount() - 1);
+        if (ok && !title.isEmpty()) {
+            TodoItem newItem(title);
+            newItem.setPlannedDate(QDate::currentDate());
+            QString newItemId = newItem.getId();
+            m_currentFolder->addItem(newItem);
+            
+            saveData();
+            updateTodoList();
+            updateFolderList();
+            updateCalendarWidget();
+            updateTagWidget();
+            updateDesktopWidget();
+            
+            QList<TodoItem> items = m_currentFolder->getItems();
+            for (int i = 0; i < items.size(); ++i) {
+                if (items[i].getId() == newItemId) {
+                    ui->todoListWidget->setCurrentRow(i);
+                    break;
+                }
+            }
+        }
+    } catch (const std::exception &e) {
+        MessageUtils::showError(this, "创建失败", QString("创建待办事项时发生错误: %1").arg(e.what()));
+    } catch (...) {
+        MessageUtils::showError(this, "创建失败", "创建待办事项时发生未知错误");
     }
 }
 
@@ -612,17 +713,23 @@ void MainWindow::onTodoTagRemoved(const QString &todoId, const QString &tag)
 
 void MainWindow::updateFolderList()
 {
+    QString currentFolderId;
+    if (m_currentFolder) {
+        currentFolderId = m_currentFolder->getId();
+    }
+    
     ui->folderListWidget->clear();
     
-    QList<TodoFolder> sortedFolders = m_folders;
-    std::sort(sortedFolders.begin(), sortedFolders.end(), [](const TodoFolder &a, const TodoFolder &b) {
+    std::sort(m_folders.begin(), m_folders.end(), [](const TodoFolder &a, const TodoFolder &b) {
         if (a.isPinned() != b.isPinned()) {
             return a.isPinned() > b.isPinned();
         }
         return a.getCreatedTime() > b.getCreatedTime();
     });
     
-    for (const TodoFolder &folder : sortedFolders) {
+    int selectRow = -1;
+    for (int i = 0; i < m_folders.size(); ++i) {
+        const TodoFolder &folder = m_folders[i];
         QString displayText = folder.getName();
         if (folder.isPinned()) {
             displayText = "📌 " + displayText;
@@ -632,11 +739,25 @@ void MainWindow::updateFolderList()
         QListWidgetItem *item = new QListWidgetItem(displayText);
         item->setData(Qt::UserRole, folder.getId());
         ui->folderListWidget->addItem(item);
+        
+        if (folder.getId() == currentFolderId) {
+            selectRow = i;
+            m_currentFolder = &m_folders[i];
+        }
+    }
+    
+    if (selectRow >= 0) {
+        ui->folderListWidget->setCurrentRow(selectRow);
     }
 }
 
 void MainWindow::updateTodoList()
 {
+    QString currentItemId;
+    if (m_currentItem) {
+        currentItemId = m_currentItem->getId();
+    }
+    
     ui->todoListWidget->clear();
     
     if (!m_currentFolder) return;
@@ -652,7 +773,9 @@ void MainWindow::updateTodoList()
         return a.getCreatedTime() > b.getCreatedTime();
     });
     
-    for (const TodoItem &item : items) {
+    int selectRow = -1;
+    for (int i = 0; i < items.size(); ++i) {
+        const TodoItem &item = items[i];
         QString displayText;
         if (item.isPinned()) {
             displayText = "📌 ";
@@ -683,6 +806,15 @@ void MainWindow::updateTodoList()
         
         listItem->setData(Qt::UserRole, item.getId());
         ui->todoListWidget->addItem(listItem);
+        
+        if (item.getId() == currentItemId) {
+            selectRow = i;
+            m_currentItem = m_currentFolder->findItem(item.getId());
+        }
+    }
+    
+    if (selectRow >= 0) {
+        ui->todoListWidget->setCurrentRow(selectRow);
     }
 }
 
@@ -753,6 +885,40 @@ void MainWindow::setupDesktopWidget()
     connect(m_desktopWidget, &DesktopWidget::newTodoRequested, this, &MainWindow::onDesktopNewTodo);
     connect(m_desktopWidget, &DesktopWidget::todoItemToggled, this, &MainWindow::onDesktopTodoToggled);
     connect(m_desktopWidget, &DesktopWidget::showMainWindowRequested, this, &MainWindow::onShowMainWindow);
+    connect(m_desktopWidget, &DesktopWidget::editTodoRequested, this, [this](const QString &itemId) {
+        for (int i = 0; i < m_folders.size(); ++i) {
+            TodoItem *item = m_folders[i].findItem(itemId);
+            if (item) {
+                ui->folderListWidget->setCurrentRow(i);
+                QList<TodoItem> items = m_folders[i].getItems();
+                for (int j = 0; j < items.size(); ++j) {
+                    if (items[j].getId() == itemId) {
+                        ui->todoListWidget->setCurrentRow(j);
+                        break;
+                    }
+                }
+                ui->tabWidget->setCurrentIndex(0);
+                show();
+                activateWindow();
+                raise();
+                break;
+            }
+        }
+    });
+    connect(m_desktopWidget, &DesktopWidget::deleteTodoRequested, this, [this](const QString &itemId) {
+        for (TodoFolder &folder : m_folders) {
+            if (folder.findItem(itemId)) {
+                folder.removeItem(itemId);
+                saveData();
+                updateFolderList();
+                updateTodoList();
+                updateCalendarWidget();
+                updateTagWidget();
+                updateDesktopWidget();
+                break;
+            }
+        }
+    });
 }
 
 void MainWindow::updateDesktopWidget()
@@ -1146,11 +1312,66 @@ void MainWindow::onDesktopWidgetClicked()
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    saveSplitterState();
     if (m_trayIcon && m_trayIcon->isVisible()) {
         hide();
         event->ignore();
     } else {
         saveData();
         event->accept();
+    }
+}
+
+void MainWindow::setupSplitter()
+{
+    QWidget *listTab = ui->tabWidget->widget(0);
+    QHBoxLayout *listTabLayout = qobject_cast<QHBoxLayout*>(listTab->layout());
+    if (!listTabLayout) return;
+    
+    QWidget *leftPanel = ui->leftPanel;
+    QWidget *middlePanel = ui->middlePanel;
+    QWidget *rightPanel = ui->rightPanel;
+    
+    if (!leftPanel || !middlePanel || !rightPanel) return;
+    
+    listTabLayout->removeWidget(leftPanel);
+    listTabLayout->removeWidget(middlePanel);
+    listTabLayout->removeWidget(rightPanel);
+    
+    m_mainSplitter = new QSplitter(Qt::Horizontal, listTab);
+    m_mainSplitter->setHandleWidth(1);
+    m_mainSplitter->setChildrenCollapsible(false);
+    
+    m_mainSplitter->addWidget(leftPanel);
+    m_mainSplitter->addWidget(middlePanel);
+    m_mainSplitter->addWidget(rightPanel);
+    
+    m_mainSplitter->setStretchFactor(0, 0);
+    m_mainSplitter->setStretchFactor(1, 1);
+    m_mainSplitter->setStretchFactor(2, 0);
+    
+    listTabLayout->addWidget(m_mainSplitter);
+}
+
+void MainWindow::saveSplitterState()
+{
+    if (!m_mainSplitter) return;
+    
+    QSettings settings("TodoList", "TodoListApp");
+    settings.setValue("splitter/state", m_mainSplitter->saveState());
+}
+
+void MainWindow::loadSplitterState()
+{
+    if (!m_mainSplitter) return;
+    
+    QSettings settings("TodoList", "TodoListApp");
+    
+    if (settings.contains("splitter/state")) {
+        m_mainSplitter->restoreState(settings.value("splitter/state").toByteArray());
+    } else {
+        QList<int> defaultSizes;
+        defaultSizes << 240 << 500 << 320;
+        m_mainSplitter->setSizes(defaultSizes);
     }
 }

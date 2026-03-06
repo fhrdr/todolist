@@ -19,7 +19,9 @@ HEADERS += \
         todofolder.h \
         desktopwidget.h \
         calendarwidget.h \
-        tagwidget.h
+        tagwidget.h \
+        fontawesome.h \
+        messageutils.h
 
 FORMS += \
     mainwindow.ui

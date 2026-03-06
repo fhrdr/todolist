@@ -46,6 +46,8 @@ static constexpr auto qt_meta_stringdata_ZN13DesktopWidgetE = QtMocHelpers::stri
     "newTodoRequested",
     "title",
     "showMainWindowRequested",
+    "editTodoRequested",
+    "deleteTodoRequested",
     "onAddTodoClicked",
     "onTodoItemClicked",
     "QListWidgetItem*",
@@ -62,31 +64,35 @@ Q_CONSTINIT static const uint qt_meta_data_ZN13DesktopWidgetE[] = {
       12,       // revision
        0,       // classname
        0,    0, // classinfo
-       6,   14, // methods
+       8,   14, // methods
        0,    0, // properties
        0,    0, // enums/sets
        0,    0, // constructors
        0,       // flags
-       3,       // signalCount
+       5,       // signalCount
 
  // signals: name, argc, parameters, tag, flags, initial metatype offsets
-       1,    2,   50,    2, 0x06,    1 /* Public */,
-       5,    1,   55,    2, 0x06,    4 /* Public */,
-       7,    0,   58,    2, 0x06,    6 /* Public */,
+       1,    2,   62,    2, 0x06,    1 /* Public */,
+       5,    1,   67,    2, 0x06,    4 /* Public */,
+       7,    0,   70,    2, 0x06,    6 /* Public */,
+       8,    1,   71,    2, 0x06,    7 /* Public */,
+       9,    1,   74,    2, 0x06,    9 /* Public */,
 
  // slots: name, argc, parameters, tag, flags, initial metatype offsets
-       8,    0,   59,    2, 0x08,    7 /* Private */,
-       9,    1,   60,    2, 0x08,    8 /* Private */,
-      12,    0,   63,    2, 0x08,   10 /* Private */,
+      10,    0,   77,    2, 0x08,   11 /* Private */,
+      11,    1,   78,    2, 0x08,   12 /* Private */,
+      14,    0,   81,    2, 0x08,   14 /* Private */,
 
  // signals: parameters
     QMetaType::Void, QMetaType::QString, QMetaType::Bool,    3,    4,
     QMetaType::Void, QMetaType::QString,    6,
     QMetaType::Void,
+    QMetaType::Void, QMetaType::QString,    3,
+    QMetaType::Void, QMetaType::QString,    3,
 
  // slots: parameters
     QMetaType::Void,
-    QMetaType::Void, 0x80000000 | 10,   11,
+    QMetaType::Void, 0x80000000 | 12,   13,
     QMetaType::Void,
 
        0        // eod
@@ -110,6 +116,12 @@ Q_CONSTINIT const QMetaObject DesktopWidget::staticMetaObject = { {
         QtPrivate::TypeAndForceComplete<const QString &, std::false_type>,
         // method 'showMainWindowRequested'
         QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'editTodoRequested'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        QtPrivate::TypeAndForceComplete<const QString &, std::false_type>,
+        // method 'deleteTodoRequested'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        QtPrivate::TypeAndForceComplete<const QString &, std::false_type>,
         // method 'onAddTodoClicked'
         QtPrivate::TypeAndForceComplete<void, std::false_type>,
         // method 'onTodoItemClicked'
@@ -129,9 +141,11 @@ void DesktopWidget::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _i
         case 0: _t->todoItemToggled((*reinterpret_cast< std::add_pointer_t<QString>>(_a[1])),(*reinterpret_cast< std::add_pointer_t<bool>>(_a[2]))); break;
         case 1: _t->newTodoRequested((*reinterpret_cast< std::add_pointer_t<QString>>(_a[1]))); break;
         case 2: _t->showMainWindowRequested(); break;
-        case 3: _t->onAddTodoClicked(); break;
-        case 4: _t->onTodoItemClicked((*reinterpret_cast< std::add_pointer_t<QListWidgetItem*>>(_a[1]))); break;
-        case 5: _t->onRefreshTimer(); break;
+        case 3: _t->editTodoRequested((*reinterpret_cast< std::add_pointer_t<QString>>(_a[1]))); break;
+        case 4: _t->deleteTodoRequested((*reinterpret_cast< std::add_pointer_t<QString>>(_a[1]))); break;
+        case 5: _t->onAddTodoClicked(); break;
+        case 6: _t->onTodoItemClicked((*reinterpret_cast< std::add_pointer_t<QListWidgetItem*>>(_a[1]))); break;
+        case 7: _t->onRefreshTimer(); break;
         default: ;
         }
     }
@@ -158,6 +172,20 @@ void DesktopWidget::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _i
                 return;
             }
         }
+        {
+            using _q_method_type = void (DesktopWidget::*)(const QString & );
+            if (_q_method_type _q_method = &DesktopWidget::editTodoRequested; *reinterpret_cast<_q_method_type *>(_a[1]) == _q_method) {
+                *result = 3;
+                return;
+            }
+        }
+        {
+            using _q_method_type = void (DesktopWidget::*)(const QString & );
+            if (_q_method_type _q_method = &DesktopWidget::deleteTodoRequested; *reinterpret_cast<_q_method_type *>(_a[1]) == _q_method) {
+                *result = 4;
+                return;
+            }
+        }
     }
 }
 
@@ -180,14 +208,14 @@ int DesktopWidget::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 6)
+        if (_id < 8)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 6;
+        _id -= 8;
     }
     if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 6)
+        if (_id < 8)
             *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType();
-        _id -= 6;
+        _id -= 8;
     }
     return _id;
 }
@@ -210,5 +238,19 @@ void DesktopWidget::newTodoRequested(const QString & _t1)
 void DesktopWidget::showMainWindowRequested()
 {
     QMetaObject::activate(this, &staticMetaObject, 2, nullptr);
+}
+
+// SIGNAL 3
+void DesktopWidget::editTodoRequested(const QString & _t1)
+{
+    void *_a[] = { nullptr, const_cast<void*>(reinterpret_cast<const void*>(std::addressof(_t1))) };
+    QMetaObject::activate(this, &staticMetaObject, 3, _a);
+}
+
+// SIGNAL 4
+void DesktopWidget::deleteTodoRequested(const QString & _t1)
+{
+    void *_a[] = { nullptr, const_cast<void*>(reinterpret_cast<const void*>(std::addressof(_t1))) };
+    QMetaObject::activate(this, &staticMetaObject, 4, _a);
 }
 QT_WARNING_POP

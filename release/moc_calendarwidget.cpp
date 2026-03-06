@@ -177,7 +177,12 @@ static constexpr auto qt_meta_stringdata_ZN12CalendarGridE = QtMocHelpers::strin
     "",
     "date",
     "todoClicked",
-    "todoId"
+    "todoId",
+    "monthChanged",
+    "year",
+    "month",
+    "onPrevMonth",
+    "onNextMonth"
 );
 #else  // !QT_MOC_HAS_STRINGDATA
 #error "qtmochelpers.h not found or too old."
@@ -189,20 +194,30 @@ Q_CONSTINIT static const uint qt_meta_data_ZN12CalendarGridE[] = {
       12,       // revision
        0,       // classname
        0,    0, // classinfo
-       2,   14, // methods
+       5,   14, // methods
        0,    0, // properties
        0,    0, // enums/sets
        0,    0, // constructors
        0,       // flags
-       2,       // signalCount
+       3,       // signalCount
 
  // signals: name, argc, parameters, tag, flags, initial metatype offsets
-       1,    1,   26,    2, 0x06,    1 /* Public */,
-       4,    1,   29,    2, 0x06,    3 /* Public */,
+       1,    1,   44,    2, 0x06,    1 /* Public */,
+       4,    1,   47,    2, 0x06,    3 /* Public */,
+       6,    2,   50,    2, 0x06,    5 /* Public */,
+
+ // slots: name, argc, parameters, tag, flags, initial metatype offsets
+       9,    0,   55,    2, 0x08,    8 /* Private */,
+      10,    0,   56,    2, 0x08,    9 /* Private */,
 
  // signals: parameters
     QMetaType::Void, QMetaType::QDate,    3,
     QMetaType::Void, QMetaType::QString,    5,
+    QMetaType::Void, QMetaType::Int, QMetaType::Int,    7,    8,
+
+ // slots: parameters
+    QMetaType::Void,
+    QMetaType::Void,
 
        0        // eod
 };
@@ -221,7 +236,15 @@ Q_CONSTINIT const QMetaObject CalendarGrid::staticMetaObject = { {
         QtPrivate::TypeAndForceComplete<const QDate &, std::false_type>,
         // method 'todoClicked'
         QtPrivate::TypeAndForceComplete<void, std::false_type>,
-        QtPrivate::TypeAndForceComplete<const QString &, std::false_type>
+        QtPrivate::TypeAndForceComplete<const QString &, std::false_type>,
+        // method 'monthChanged'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        QtPrivate::TypeAndForceComplete<int, std::false_type>,
+        QtPrivate::TypeAndForceComplete<int, std::false_type>,
+        // method 'onPrevMonth'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'onNextMonth'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>
     >,
     nullptr
 } };
@@ -233,6 +256,9 @@ void CalendarGrid::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id
         switch (_id) {
         case 0: _t->dateClicked((*reinterpret_cast< std::add_pointer_t<QDate>>(_a[1]))); break;
         case 1: _t->todoClicked((*reinterpret_cast< std::add_pointer_t<QString>>(_a[1]))); break;
+        case 2: _t->monthChanged((*reinterpret_cast< std::add_pointer_t<int>>(_a[1])),(*reinterpret_cast< std::add_pointer_t<int>>(_a[2]))); break;
+        case 3: _t->onPrevMonth(); break;
+        case 4: _t->onNextMonth(); break;
         default: ;
         }
     }
@@ -249,6 +275,13 @@ void CalendarGrid::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id
             using _q_method_type = void (CalendarGrid::*)(const QString & );
             if (_q_method_type _q_method = &CalendarGrid::todoClicked; *reinterpret_cast<_q_method_type *>(_a[1]) == _q_method) {
                 *result = 1;
+                return;
+            }
+        }
+        {
+            using _q_method_type = void (CalendarGrid::*)(int , int );
+            if (_q_method_type _q_method = &CalendarGrid::monthChanged; *reinterpret_cast<_q_method_type *>(_a[1]) == _q_method) {
+                *result = 2;
                 return;
             }
         }
@@ -274,14 +307,14 @@ int CalendarGrid::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 2)
+        if (_id < 5)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 2;
+        _id -= 5;
     }
     if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 2)
+        if (_id < 5)
             *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType();
-        _id -= 2;
+        _id -= 5;
     }
     return _id;
 }
@@ -299,6 +332,13 @@ void CalendarGrid::todoClicked(const QString & _t1)
     void *_a[] = { nullptr, const_cast<void*>(reinterpret_cast<const void*>(std::addressof(_t1))) };
     QMetaObject::activate(this, &staticMetaObject, 1, _a);
 }
+
+// SIGNAL 2
+void CalendarGrid::monthChanged(int _t1, int _t2)
+{
+    void *_a[] = { nullptr, const_cast<void*>(reinterpret_cast<const void*>(std::addressof(_t1))), const_cast<void*>(reinterpret_cast<const void*>(std::addressof(_t2))) };
+    QMetaObject::activate(this, &staticMetaObject, 2, _a);
+}
 namespace {
 struct qt_meta_tag_ZN12TodoListItemE_t {};
 } // unnamed namespace
@@ -310,8 +350,7 @@ static constexpr auto qt_meta_stringdata_ZN12TodoListItemE = QtMocHelpers::strin
     "clicked",
     "",
     "todoId",
-    "toggled",
-    "completed"
+    "doubleClicked"
 );
 #else  // !QT_MOC_HAS_STRINGDATA
 #error "qtmochelpers.h not found or too old."
@@ -332,11 +371,11 @@ Q_CONSTINIT static const uint qt_meta_data_ZN12TodoListItemE[] = {
 
  // signals: name, argc, parameters, tag, flags, initial metatype offsets
        1,    1,   26,    2, 0x06,    1 /* Public */,
-       4,    2,   29,    2, 0x06,    3 /* Public */,
+       4,    1,   29,    2, 0x06,    3 /* Public */,
 
  // signals: parameters
     QMetaType::Void, QMetaType::QString,    3,
-    QMetaType::Void, QMetaType::QString, QMetaType::Bool,    3,    5,
+    QMetaType::Void, QMetaType::QString,    3,
 
        0        // eod
 };
@@ -353,10 +392,9 @@ Q_CONSTINIT const QMetaObject TodoListItem::staticMetaObject = { {
         // method 'clicked'
         QtPrivate::TypeAndForceComplete<void, std::false_type>,
         QtPrivate::TypeAndForceComplete<const QString &, std::false_type>,
-        // method 'toggled'
+        // method 'doubleClicked'
         QtPrivate::TypeAndForceComplete<void, std::false_type>,
-        QtPrivate::TypeAndForceComplete<const QString &, std::false_type>,
-        QtPrivate::TypeAndForceComplete<bool, std::false_type>
+        QtPrivate::TypeAndForceComplete<const QString &, std::false_type>
     >,
     nullptr
 } };
@@ -367,7 +405,7 @@ void TodoListItem::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id
     if (_c == QMetaObject::InvokeMetaMethod) {
         switch (_id) {
         case 0: _t->clicked((*reinterpret_cast< std::add_pointer_t<QString>>(_a[1]))); break;
-        case 1: _t->toggled((*reinterpret_cast< std::add_pointer_t<QString>>(_a[1])),(*reinterpret_cast< std::add_pointer_t<bool>>(_a[2]))); break;
+        case 1: _t->doubleClicked((*reinterpret_cast< std::add_pointer_t<QString>>(_a[1]))); break;
         default: ;
         }
     }
@@ -381,8 +419,8 @@ void TodoListItem::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id
             }
         }
         {
-            using _q_method_type = void (TodoListItem::*)(const QString & , bool );
-            if (_q_method_type _q_method = &TodoListItem::toggled; *reinterpret_cast<_q_method_type *>(_a[1]) == _q_method) {
+            using _q_method_type = void (TodoListItem::*)(const QString & );
+            if (_q_method_type _q_method = &TodoListItem::doubleClicked; *reinterpret_cast<_q_method_type *>(_a[1]) == _q_method) {
                 *result = 1;
                 return;
             }
@@ -429,9 +467,9 @@ void TodoListItem::clicked(const QString & _t1)
 }
 
 // SIGNAL 1
-void TodoListItem::toggled(const QString & _t1, bool _t2)
+void TodoListItem::doubleClicked(const QString & _t1)
 {
-    void *_a[] = { nullptr, const_cast<void*>(reinterpret_cast<const void*>(std::addressof(_t1))), const_cast<void*>(reinterpret_cast<const void*>(std::addressof(_t2))) };
+    void *_a[] = { nullptr, const_cast<void*>(reinterpret_cast<const void*>(std::addressof(_t1))) };
     QMetaObject::activate(this, &staticMetaObject, 1, _a);
 }
 namespace {
@@ -453,8 +491,14 @@ static constexpr auto qt_meta_stringdata_ZN14CalendarWidgetE = QtMocHelpers::str
     "onDateClicked",
     "onTodoClicked",
     "todoId",
+    "onTodoDoubleClicked",
     "onAddTodo",
-    "onDeleteTodo"
+    "onDeleteTodo",
+    "onToggleTodo",
+    "onPrevMonth",
+    "onNextMonth",
+    "onPrevYear",
+    "onNextYear"
 );
 #else  // !QT_MOC_HAS_STRINGDATA
 #error "qtmochelpers.h not found or too old."
@@ -466,7 +510,7 @@ Q_CONSTINIT static const uint qt_meta_data_ZN14CalendarWidgetE[] = {
       12,       // revision
        0,       // classname
        0,    0, // classinfo
-       7,   14, // methods
+      13,   14, // methods
        0,    0, // properties
        0,    0, // enums/sets
        0,    0, // constructors
@@ -474,15 +518,21 @@ Q_CONSTINIT static const uint qt_meta_data_ZN14CalendarWidgetE[] = {
        3,       // signalCount
 
  // signals: name, argc, parameters, tag, flags, initial metatype offsets
-       1,    2,   56,    2, 0x06,    1 /* Public */,
-       5,    2,   61,    2, 0x06,    4 /* Public */,
-       8,    1,   66,    2, 0x06,    7 /* Public */,
+       1,    2,   92,    2, 0x06,    1 /* Public */,
+       5,    2,   97,    2, 0x06,    4 /* Public */,
+       8,    1,  102,    2, 0x06,    7 /* Public */,
 
  // slots: name, argc, parameters, tag, flags, initial metatype offsets
-       9,    1,   69,    2, 0x08,    9 /* Private */,
-      10,    1,   72,    2, 0x08,   11 /* Private */,
-      12,    0,   75,    2, 0x08,   13 /* Private */,
-      13,    0,   76,    2, 0x08,   14 /* Private */,
+       9,    1,  105,    2, 0x08,    9 /* Private */,
+      10,    1,  108,    2, 0x08,   11 /* Private */,
+      12,    1,  111,    2, 0x08,   13 /* Private */,
+      13,    0,  114,    2, 0x08,   15 /* Private */,
+      14,    0,  115,    2, 0x08,   16 /* Private */,
+      15,    0,  116,    2, 0x08,   17 /* Private */,
+      16,    0,  117,    2, 0x08,   18 /* Private */,
+      17,    0,  118,    2, 0x08,   19 /* Private */,
+      18,    0,  119,    2, 0x08,   20 /* Private */,
+      19,    0,  120,    2, 0x08,   21 /* Private */,
 
  // signals: parameters
     QMetaType::Void, QMetaType::QString, QMetaType::QDate,    3,    4,
@@ -492,6 +542,12 @@ Q_CONSTINIT static const uint qt_meta_data_ZN14CalendarWidgetE[] = {
  // slots: parameters
     QMetaType::Void, QMetaType::QDate,    4,
     QMetaType::Void, QMetaType::QString,   11,
+    QMetaType::Void, QMetaType::QString,   11,
+    QMetaType::Void,
+    QMetaType::Void,
+    QMetaType::Void,
+    QMetaType::Void,
+    QMetaType::Void,
     QMetaType::Void,
     QMetaType::Void,
 
@@ -524,9 +580,22 @@ Q_CONSTINIT const QMetaObject CalendarWidget::staticMetaObject = { {
         // method 'onTodoClicked'
         QtPrivate::TypeAndForceComplete<void, std::false_type>,
         QtPrivate::TypeAndForceComplete<const QString &, std::false_type>,
+        // method 'onTodoDoubleClicked'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        QtPrivate::TypeAndForceComplete<const QString &, std::false_type>,
         // method 'onAddTodo'
         QtPrivate::TypeAndForceComplete<void, std::false_type>,
         // method 'onDeleteTodo'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'onToggleTodo'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'onPrevMonth'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'onNextMonth'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'onPrevYear'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'onNextYear'
         QtPrivate::TypeAndForceComplete<void, std::false_type>
     >,
     nullptr
@@ -542,8 +611,14 @@ void CalendarWidget::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _
         case 2: _t->todoItemDeleted((*reinterpret_cast< std::add_pointer_t<QString>>(_a[1]))); break;
         case 3: _t->onDateClicked((*reinterpret_cast< std::add_pointer_t<QDate>>(_a[1]))); break;
         case 4: _t->onTodoClicked((*reinterpret_cast< std::add_pointer_t<QString>>(_a[1]))); break;
-        case 5: _t->onAddTodo(); break;
-        case 6: _t->onDeleteTodo(); break;
+        case 5: _t->onTodoDoubleClicked((*reinterpret_cast< std::add_pointer_t<QString>>(_a[1]))); break;
+        case 6: _t->onAddTodo(); break;
+        case 7: _t->onDeleteTodo(); break;
+        case 8: _t->onToggleTodo(); break;
+        case 9: _t->onPrevMonth(); break;
+        case 10: _t->onNextMonth(); break;
+        case 11: _t->onPrevYear(); break;
+        case 12: _t->onNextYear(); break;
         default: ;
         }
     }
@@ -592,14 +667,14 @@ int CalendarWidget::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 7)
+        if (_id < 13)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 7;
+        _id -= 13;
     }
     if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 7)
+        if (_id < 13)
             *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType();
-        _id -= 7;
+        _id -= 13;
     }
     return _id;
 }
