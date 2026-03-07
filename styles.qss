@@ -411,7 +411,7 @@ QCalendarWidget QMenu {
 QComboBox {
     border: 1px solid #e2e8f0;
     border-radius: 6px;
-    padding: 8px 12px;
+    padding: 8px 30px 8px 12px;
     background-color: #ffffff;
     color: #334155;
     min-width: 100px;
@@ -428,14 +428,14 @@ QComboBox:focus {
 QComboBox::drop-down {
     border: none;
     width: 24px;
+    subcontrol-origin: padding;
+    subcontrol-position: center right;
 }
 
 QComboBox::down-arrow {
-    image: none;
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 6px solid #64748b;
-    margin-right: 8px;
+    image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iMTIiIHZpZXdCb3g9IjAgMCAxMiAxMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMyA0LjVMNiA3LjVMOSA0LjUiIHN0cm9rZT0iIzY0NzQ4YiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4=);
+    width: 12px;
+    height: 12px;
 }
 
 QComboBox QAbstractItemView {

@@ -186,17 +186,24 @@ void TodoItemWidget::paintEvent(QPaintEvent *event)
     if (m_completed) {
         if (!m_tagColor.isEmpty()) {
             QColor baseColor(m_tagColor);
-            QColor lightColor = QColor(baseColor.red(), baseColor.green(), baseColor.blue(), 60);
-            painter.fillRect(contentRect, lightColor);
+            QColor lightColor = QColor(baseColor.red(), baseColor.green(), baseColor.blue(), 25);
+            QColor whiteColor = QColor(255, 255, 255, 255);
+            QLinearGradient gradient(contentRect.left(), contentRect.top(), 
+                                     contentRect.right(), contentRect.top());
+            gradient.setColorAt(0, lightColor);
+            gradient.setColorAt(1, whiteColor);
+            painter.fillRect(contentRect, gradient);
         } else {
-            painter.fillRect(contentRect, QColor(248, 250, 252));
+            painter.fillRect(contentRect, QColor(252, 252, 253));
         }
     } else if (!m_tagColor.isEmpty()) {
         QColor baseColor(m_tagColor);
-        QColor lightColor = baseColor.lighter(170);
-        QLinearGradient gradient(contentRect.left(), contentRect.top(), contentRect.right(), contentRect.bottom());
+        QColor lightColor = QColor(baseColor.red(), baseColor.green(), baseColor.blue(), 40);
+        QColor whiteColor = QColor(255, 255, 255, 255);
+        QLinearGradient gradient(contentRect.left(), contentRect.top(), 
+                                 contentRect.right(), contentRect.top());
         gradient.setColorAt(0, lightColor);
-        gradient.setColorAt(1, QColor(255, 255, 255));
+        gradient.setColorAt(1, whiteColor);
         painter.fillRect(contentRect, gradient);
     } else {
         painter.fillRect(contentRect, QColor(255, 255, 255));
@@ -226,7 +233,7 @@ void TodoItemWidget::paintEvent(QPaintEvent *event)
     titleFont.setPixelSize(15);
     titleFont.setBold(!m_completed);
     painter.setFont(titleFont);
-    painter.setPen(m_completed ? QColor(170, 180, 190) : QColor(30, 41, 59));
+    painter.setPen(m_completed ? QColor(180, 185, 190) : QColor(30, 41, 59));
     
     QFontMetrics fm(titleFont);
     QString elidedTitle = fm.elidedText(m_title, Qt::ElideRight, width() - 120);
@@ -259,7 +266,7 @@ void TodoItemWidget::paintEvent(QPaintEvent *event)
     if (!m_tagColor.isEmpty()) {
         QColor tagColor(m_tagColor);
         if (m_completed) {
-            tagColor = QColor(tagColor.red(), tagColor.green(), tagColor.blue(), 120);
+            tagColor = QColor(tagColor.red(), tagColor.green(), tagColor.blue(), 100);
         }
         painter.setPen(Qt::NoPen);
         painter.setBrush(tagColor);
@@ -308,13 +315,13 @@ void TagWidget::setupUI()
     leftLayout->addWidget(m_cloudPanel, 1);
     
     m_listPanel = new QWidget();
-    m_listPanel->setStyleSheet("background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;");
+    m_listPanel->setStyleSheet("background-color: #ffffff; border: none;");
     m_listLayout = new QVBoxLayout(m_listPanel);
     m_listLayout->setContentsMargins(0, 0, 0, 0);
     m_listLayout->setSpacing(0);
     
     QWidget *listHeader = new QWidget();
-    listHeader->setStyleSheet("background-color: transparent;");
+    listHeader->setStyleSheet("background-color: #ffffff; border-bottom: 1px solid #e2e8f0;");
     listHeader->setFixedHeight(40);
     QHBoxLayout *listHeaderLayout = new QHBoxLayout(listHeader);
     listHeaderLayout->setContentsMargins(20, 8, 20, 8);
@@ -373,14 +380,14 @@ void TagWidget::setupUI()
     m_mainLayout->addWidget(leftPanel, 1);
     
     m_todoPanel = new QWidget();
-    m_todoPanel->setStyleSheet("background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;");
+    m_todoPanel->setStyleSheet("background-color: #ffffff; border: none;");
     m_todoPanel->setMinimumWidth(400);
     QVBoxLayout *todoMainLayout = new QVBoxLayout(m_todoPanel);
     todoMainLayout->setContentsMargins(0, 0, 0, 0);
     todoMainLayout->setSpacing(0);
     
     QWidget *todoHeader = new QWidget();
-    todoHeader->setStyleSheet("background-color: transparent;");
+    todoHeader->setStyleSheet("background-color: #ffffff; border-bottom: 1px solid #e2e8f0;");
     QVBoxLayout *todoHeaderLayout = new QVBoxLayout(todoHeader);
     todoHeaderLayout->setContentsMargins(20, 16, 20, 12);
     todoHeaderLayout->setSpacing(6);

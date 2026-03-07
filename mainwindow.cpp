@@ -10,6 +10,155 @@
 #include <QTimer>
 #include <QStyledItemDelegate>
 #include <QPainter>
+#include <QDialogButtonBox>
+#include <QDialog>
+#include <QLabel>
+#include <QPushButton>
+
+namespace {
+    QString showInputDialog(QWidget *parent, const QString &title, const QString &label, QString defaultValue = "")
+    {
+        QDialog dialog(parent);
+        dialog.setWindowTitle(title);
+        dialog.setMinimumWidth(350);
+        dialog.setStyleSheet(R"(
+            QDialog {
+                background-color: #ffffff;
+            }
+            QLabel {
+                color: #334155;
+                font-size: 13px;
+            }
+            QLineEdit {
+                border: 1px solid #e2e8f0;
+                border-radius: 6px;
+                padding: 8px 12px;
+                background-color: #ffffff;
+                color: #334155;
+                font-size: 13px;
+            }
+            QLineEdit:focus {
+                border-color: #3b82f6;
+            }
+            QPushButton {
+                background-color: #ffffff;
+                border: 2px solid #3b82f6;
+                border-radius: 6px;
+                color: #3b82f6;
+                padding: 8px 20px;
+                font-size: 13px;
+                font-weight: 500;
+                min-width: 70px;
+            }
+            QPushButton:hover {
+                background-color: rgba(59, 130, 246, 0.1);
+            }
+            QPushButton:pressed {
+                background-color: rgba(59, 130, 246, 0.2);
+            }
+        )");
+        
+        QVBoxLayout *layout = new QVBoxLayout(&dialog);
+        layout->setContentsMargins(20, 20, 20, 20);
+        layout->setSpacing(16);
+        
+        QLabel *labelWidget = new QLabel(label);
+        layout->addWidget(labelWidget);
+        
+        QLineEdit *lineEdit = new QLineEdit(defaultValue);
+        layout->addWidget(lineEdit);
+        
+        QDialogButtonBox *buttonBox = new QDialogButtonBox();
+        QPushButton *okBtn = new QPushButton("确定");
+        QPushButton *cancelBtn = new QPushButton("取消");
+        okBtn->setDefault(true);
+        buttonBox->addButton(okBtn, QDialogButtonBox::AcceptRole);
+        buttonBox->addButton(cancelBtn, QDialogButtonBox::RejectRole);
+        layout->addWidget(buttonBox);
+        
+        QObject::connect(okBtn, &QPushButton::clicked, &dialog, &QDialog::accept);
+        QObject::connect(cancelBtn, &QPushButton::clicked, &dialog, &QDialog::reject);
+        QObject::connect(lineEdit, &QLineEdit::returnPressed, &dialog, &QDialog::accept);
+        
+        lineEdit->setFocus();
+        
+        if (dialog.exec() == QDialog::Accepted) {
+            return lineEdit->text();
+        }
+        return QString();
+    }
+    
+    QString showItemDialog(QWidget *parent, const QString &title, const QString &label, const QStringList &items, int current = 0, bool editable = true)
+    {
+        QDialog dialog(parent);
+        dialog.setWindowTitle(title);
+        dialog.setMinimumWidth(350);
+        dialog.setStyleSheet(R"(
+            QDialog {
+                background-color: #ffffff;
+            }
+            QLabel {
+                color: #334155;
+                font-size: 13px;
+            }
+            QComboBox {
+                border: 1px solid #e2e8f0;
+                border-radius: 6px;
+                padding: 8px 30px 8px 12px;
+                background-color: #ffffff;
+                color: #334155;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 24px;
+            }
+            QPushButton {
+                background-color: #ffffff;
+                border: 2px solid #3b82f6;
+                border-radius: 6px;
+                color: #3b82f6;
+                padding: 8px 20px;
+                font-size: 13px;
+                font-weight: 500;
+                min-width: 70px;
+            }
+            QPushButton:hover {
+                background-color: rgba(59, 130, 246, 0.1);
+            }
+        )");
+        
+        QVBoxLayout *layout = new QVBoxLayout(&dialog);
+        layout->setContentsMargins(20, 20, 20, 20);
+        layout->setSpacing(16);
+        
+        QLabel *labelWidget = new QLabel(label);
+        layout->addWidget(labelWidget);
+        
+        QComboBox *comboBox = new QComboBox();
+        comboBox->addItems(items);
+        comboBox->setCurrentIndex(current);
+        comboBox->setEditable(editable);
+        layout->addWidget(comboBox);
+        
+        QDialogButtonBox *buttonBox = new QDialogButtonBox();
+        QPushButton *okBtn = new QPushButton("确定");
+        QPushButton *cancelBtn = new QPushButton("取消");
+        okBtn->setDefault(true);
+        buttonBox->addButton(okBtn, QDialogButtonBox::AcceptRole);
+        buttonBox->addButton(cancelBtn, QDialogButtonBox::RejectRole);
+        layout->addWidget(buttonBox);
+        
+        QObject::connect(okBtn, &QPushButton::clicked, &dialog, &QDialog::accept);
+        QObject::connect(cancelBtn, &QPushButton::clicked, &dialog, &QDialog::reject);
+        
+        comboBox->setFocus();
+        
+        if (dialog.exec() == QDialog::Accepted) {
+            return comboBox->currentText();
+        }
+        return QString();
+    }
+}
 
 class TodoItemDelegate : public QStyledItemDelegate
 {
@@ -24,30 +173,64 @@ public:
         bool isSelected = option.state & QStyle::State_Selected;
         bool isCompleted = index.data(Qt::ForegroundRole).isValid() && 
                           index.data(Qt::ForegroundRole).value<QColor>() == QColor(156, 163, 175);
+        QString tagColor = index.data(Qt::UserRole + 1).toString();
         
-        if (isCompleted && !isSelected) {
-            painter->fillRect(option.rect, QColor(252, 252, 253));
-        }
-        if (isSelected) {
-            painter->fillRect(option.rect, QColor(239, 246, 255));
+        QRect contentRect = option.rect.adjusted(4, 2, -4, -2);
+        
+        painter->setPen(Qt::NoPen);
+        
+        if (isCompleted) {
+            if (!tagColor.isEmpty()) {
+                QColor baseColor(tagColor);
+                QColor lightColor = QColor(baseColor.red(), baseColor.green(), baseColor.blue(), 25);
+                QColor whiteColor = QColor(255, 255, 255, 255);
+                QLinearGradient gradient(contentRect.right(), contentRect.top(), 
+                                         contentRect.left(), contentRect.top());
+                gradient.setColorAt(0, lightColor);
+                gradient.setColorAt(1, whiteColor);
+                painter->setBrush(gradient);
+                painter->drawRoundedRect(contentRect, 8, 8);
+            } else {
+                painter->setBrush(QColor(252, 252, 253));
+                painter->drawRoundedRect(contentRect, 8, 8);
+            }
+        } else if (!tagColor.isEmpty()) {
+            QColor baseColor(tagColor);
+            QColor lightColor = QColor(baseColor.red(), baseColor.green(), baseColor.blue(), 40);
+            QColor whiteColor = QColor(255, 255, 255, 255);
+            QLinearGradient gradient(contentRect.right(), contentRect.top(), 
+                                     contentRect.left(), contentRect.top());
+            gradient.setColorAt(0, lightColor);
+            gradient.setColorAt(1, whiteColor);
+            painter->setBrush(gradient);
+            painter->drawRoundedRect(contentRect, 8, 8);
+        } else if (isSelected) {
+            painter->setBrush(QColor(239, 246, 255));
+            painter->drawRoundedRect(contentRect, 8, 8);
+        } else {
+            painter->setBrush(QColor(255, 255, 255));
+            painter->drawRoundedRect(contentRect, 8, 8);
         }
         
         if (isCompleted) {
-            painter->setPen(QPen(QColor(180, 190, 200), 1.5));
-            painter->setBrush(QColor(200, 210, 220));
-            QRect checkRect(option.rect.left() + 12, option.rect.top() + 18, 16, 16);
+            QColor checkBgColor = tagColor.isEmpty() ? QColor(200, 210, 220) : QColor(tagColor);
+            checkBgColor = QColor(checkBgColor.red(), checkBgColor.green(), checkBgColor.blue(), 150);
+            
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(checkBgColor);
+            QRect checkRect(contentRect.left() + 8, contentRect.top() + (contentRect.height() - 16) / 2, 16, 16);
             painter->drawRoundedRect(checkRect, 3, 3);
             
             QPainterPath checkPath;
             checkPath.moveTo(checkRect.left() + 3, checkRect.center().y());
             checkPath.lineTo(checkRect.center().x(), checkRect.bottom() - 3);
             checkPath.lineTo(checkRect.right() - 3, checkRect.top() + 3);
-            painter->setPen(QPen(QColor(150, 160, 170), 2));
+            painter->setPen(QPen(QColor(255, 255, 255), 2));
             painter->drawPath(checkPath);
         } else {
             painter->setPen(QPen(QColor(203, 213, 225), 2));
             painter->setBrush(Qt::NoBrush);
-            QRect checkRect(option.rect.left() + 12, option.rect.top() + 18, 16, 16);
+            QRect checkRect(contentRect.left() + 8, contentRect.top() + (contentRect.height() - 16) / 2, 16, 16);
             painter->drawRoundedRect(checkRect, 3, 3);
         }
         
@@ -66,14 +249,14 @@ public:
             title = titleLine;
         }
         
-        QRect rect = option.rect.adjusted(36, 6, -12, -6);
+        QRect rect = contentRect.adjusted(32, 6, -8, -6);
         
         QFont titleFont;
         titleFont.setPixelSize(14);
         titleFont.setBold(!isCompleted);
         painter->setFont(titleFont);
         
-        QColor titleColor = isCompleted ? QColor(170, 180, 190) : QColor(30, 41, 59);
+        QColor titleColor = isCompleted ? QColor(180, 185, 190) : QColor(30, 41, 59);
         painter->setPen(titleColor);
         
         QFontMetrics fm(titleFont);
@@ -87,7 +270,7 @@ public:
             dateFont.setPixelSize(12);
             painter->setFont(dateFont);
             painter->setPen(isCompleted ? QColor(156, 163, 175) : QColor(100, 116, 139));
-            painter->drawText(QRect(rect.right() - dateWidth + 10, rect.top(), dateWidth, 22), Qt::AlignRight | Qt::AlignVCenter, date);
+            painter->drawText(QRect(rect.right() - dateWidth, rect.top(), dateWidth, 22), Qt::AlignRight | Qt::AlignVCenter, date);
         }
         
         if (!subLine.isEmpty()) {
@@ -108,7 +291,7 @@ public:
     {
         Q_UNUSED(option)
         Q_UNUSED(index)
-        return QSize(200, 52);
+        return QSize(200, 56);
     }
 };
 
@@ -490,6 +673,20 @@ void MainWindow::setupConnections()
     connect(ui->completedCheckBox, &QCheckBox::toggled, this, &MainWindow::onCompletedToggled);
     connect(ui->syncBtn, &QPushButton::clicked, this, &MainWindow::onSyncClicked);
     
+    connect(ui->tagColorComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index) {
+        QStringList colors = {"#3b82f6", "#10b981", "#ef4444", "#f59e0b", "#8b5cf6", "#06b6d4"};
+        QString color = (index >= 0 && index < colors.size()) ? colors[index] : "#ffffff";
+        ui->tagColorComboBox->setStyleSheet(
+            QString("QComboBox { background-color: %1; border: 1px solid #e2e8f0; border-radius: 6px; "
+                    "padding: 8px 12px; color: %2; }"
+                    "QComboBox:hover { border-color: #94a3b8; }"
+                    "QComboBox::drop-down { border: none; width: 24px; }"
+                    "QComboBox QAbstractItemView { background-color: #ffffff; color: #334155; }")
+            .arg(color)
+            .arg(index == 0 ? "#334155" : "#ffffff")
+        );
+    });
+    
     connect(ui->addTagBtn, &QPushButton::clicked, this, [this]() {
         if (!m_currentItem) return;
         
@@ -505,10 +702,9 @@ void MainWindow::setupConnections()
         QStringList sortedTags = existingTags.values();
         std::sort(sortedTags.begin(), sortedTags.end());
         
-        bool ok;
-        QString newTag = QInputDialog::getItem(this, "添加标签", "选择或输入标签:", sortedTags, 0, true, &ok);
+        QString newTag = showItemDialog(this, "添加标签", "选择或输入标签:", sortedTags, 0, true);
         
-        if (ok && !newTag.trimmed().isEmpty()) {
+        if (!newTag.trimmed().isEmpty()) {
             m_currentItem->addTag(newTag.trimmed());
             updateTodoTags();
             updateTagWidget();
@@ -525,10 +721,9 @@ void MainWindow::setupConnections()
 void MainWindow::onNewFolderClicked()
 {
     try {
-        bool ok;
-        QString folderName = QInputDialog::getText(this, "新建文件夹", "请输入文件夹名称:", QLineEdit::Normal, "新建文件夹", &ok);
+        QString folderName = showInputDialog(this, "新建文件夹", "请输入文件夹名称:", "新建文件夹");
         
-        if (ok && !folderName.isEmpty()) {
+        if (!folderName.isEmpty()) {
             TodoFolder newFolder(folderName);
             m_folders.append(newFolder);
             
@@ -655,11 +850,9 @@ void MainWindow::onFolderDoubleClicked(QListWidgetItem* item)
     }
     
     if (foundFolder) {
-        bool ok;
-        QString newName = QInputDialog::getText(this, "重命名文件夹", "请输入新的文件夹名称:", 
-            QLineEdit::Normal, foundFolder->getName(), &ok);
+        QString newName = showInputDialog(this, "重命名文件夹", "请输入新的文件夹名称:", foundFolder->getName());
         
-        if (ok && !newName.isEmpty()) {
+        if (!newName.isEmpty()) {
             foundFolder->setName(newName);
             updateFolderList();
             updateCalendarWidget();
@@ -721,12 +914,12 @@ void MainWindow::onNewTodoClicked()
             return;
         }
         
-        bool ok;
-        QString title = QInputDialog::getText(this, "新建待办事项", "请输入待办事项标题:", QLineEdit::Normal, "", &ok);
+        QString title = showInputDialog(this, "新建待办事项", "请输入待办事项标题:");
         
-        if (ok && !title.isEmpty()) {
+        if (!title.isEmpty()) {
             TodoItem newItem(title);
             newItem.setPlannedDate(QDate::currentDate());
+            newItem.setDueDate(QDate::currentDate());
             QString newItemId = newItem.getId();
             m_currentFolder->addItem(newItem);
             
@@ -1084,6 +1277,7 @@ void MainWindow::updateTodoList()
         }
         
         listItem->setData(Qt::UserRole, item.getId());
+        listItem->setData(Qt::UserRole + 1, item.getTagColor());
         ui->todoListWidget->addItem(listItem);
         
         if (item.getId() == currentItemId) {
@@ -1148,6 +1342,17 @@ void MainWindow::updateDetailPanel()
         else if (tagColor == "#06b6d4") colorIndex = 5;
         ui->tagColorComboBox->setCurrentIndex(colorIndex);
         ui->tagColorComboBox->setEnabled(true);
+        
+        QString bgColor = tagColor.isEmpty() ? "#ffffff" : tagColor;
+        ui->tagColorComboBox->setStyleSheet(
+            QString("QComboBox { background-color: %1; border: 1px solid #e2e8f0; border-radius: 6px; "
+                    "padding: 8px 12px; color: %2; }"
+                    "QComboBox:hover { border-color: #94a3b8; }"
+                    "QComboBox::drop-down { border: none; width: 24px; }"
+                    "QComboBox QAbstractItemView { background-color: #ffffff; color: #334155; }")
+            .arg(bgColor)
+            .arg(tagColor.isEmpty() ? "#334155" : "#ffffff")
+        );
     }
     
     updateTodoTags();
@@ -1186,6 +1391,12 @@ void MainWindow::clearDetailPanel()
     if (ui->tagColorComboBox) {
         ui->tagColorComboBox->setCurrentIndex(0);
         ui->tagColorComboBox->setEnabled(false);
+        ui->tagColorComboBox->setStyleSheet(
+            "QComboBox { background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; "
+            "padding: 8px 12px; color: #334155; }"
+            "QComboBox::drop-down { border: none; width: 24px; }"
+            "QComboBox QAbstractItemView { background-color: #ffffff; color: #334155; }"
+        );
     }
     if (ui->tagsDisplayLabel) {
         ui->tagsDisplayLabel->setText("无标签");

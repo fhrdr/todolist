@@ -107,12 +107,19 @@ void CalendarCell::paintEvent(QPaintEvent *event)
         
         QColor tagColor;
         if (todo.isCompleted()) {
-            tagColor = QColor(180, 190, 200);
+            if (!todo.getTagColor().isEmpty()) {
+                QColor baseColor(todo.getTagColor());
+                tagColor = QColor(baseColor.red(), baseColor.green(), baseColor.blue(), 60);
+            } else {
+                tagColor = QColor(200, 205, 210, 120);
+            }
         } else if (!todo.getTagColor().isEmpty()) {
-            tagColor = QColor(todo.getTagColor());
+            QColor baseColor(todo.getTagColor());
+            tagColor = QColor(baseColor.red(), baseColor.green(), baseColor.blue(), 140);
         } else {
             int priority = qBound(0, todo.getPriority(), 2);
-            tagColor = priorityColors[priority];
+            QColor baseColor = priorityColors[priority];
+            tagColor = QColor(baseColor.red(), baseColor.green(), baseColor.blue(), 140);
         }
         
         painter.setPen(Qt::NoPen);
@@ -122,7 +129,8 @@ void CalendarCell::paintEvent(QPaintEvent *event)
         QFont todoFont;
         todoFont.setPixelSize(10);
         painter.setFont(todoFont);
-        painter.setPen(Qt::white);
+        QColor textColor = todo.isCompleted() ? QColor(120, 125, 130) : QColor(50, 55, 60);
+        painter.setPen(textColor);
         
         QFontMetrics fm(todoFont);
         QString text = fm.elidedText(todo.getTitle(), Qt::ElideRight, todoRect.width() - 6);
@@ -404,23 +412,29 @@ void TodoListItem::paintEvent(QPaintEvent *event)
     if (m_completed) {
         if (!m_tagColor.isEmpty()) {
             QColor baseColor(m_tagColor);
-            QColor lightColor = QColor(baseColor.red(), baseColor.green(), baseColor.blue(), 60);
+            QColor lightColor = QColor(baseColor.red(), baseColor.green(), baseColor.blue(), 25);
+            QColor whiteColor = QColor(255, 255, 255, 255);
+            QLinearGradient gradient(contentRect.left(), contentRect.top(), 
+                                     contentRect.right(), contentRect.top());
+            gradient.setColorAt(0, lightColor);
+            gradient.setColorAt(1, whiteColor);
             painter.setPen(Qt::NoPen);
-            painter.setBrush(lightColor);
+            painter.setBrush(gradient);
             painter.drawRoundedRect(contentRect, 6, 6);
         } else {
             painter.setPen(Qt::NoPen);
-            painter.setBrush(QColor(248, 250, 252));
+            painter.setBrush(QColor(252, 252, 253));
             painter.drawRoundedRect(contentRect, 6, 6);
         }
     } else {
         if (!m_tagColor.isEmpty()) {
             QColor baseColor(m_tagColor);
-            QColor lightColor = baseColor.lighter(160);
+            QColor lightColor = QColor(baseColor.red(), baseColor.green(), baseColor.blue(), 40);
+            QColor whiteColor = QColor(255, 255, 255, 255);
             QLinearGradient gradient(contentRect.left(), contentRect.top(), 
-                                     contentRect.right(), contentRect.bottom());
+                                     contentRect.right(), contentRect.top());
             gradient.setColorAt(0, lightColor);
-            gradient.setColorAt(1, QColor(255, 255, 255));
+            gradient.setColorAt(1, whiteColor);
             painter.setPen(Qt::NoPen);
             painter.setBrush(gradient);
             painter.drawRoundedRect(contentRect, 6, 6);
@@ -442,11 +456,11 @@ void TodoListItem::paintEvent(QPaintEvent *event)
     if (!m_tagColor.isEmpty()) {
         tagColor = QColor(m_tagColor);
         if (m_completed) {
-            tagColor = QColor(tagColor.red(), tagColor.green(), tagColor.blue(), 120);
+            tagColor = QColor(tagColor.red(), tagColor.green(), tagColor.blue(), 100);
         }
     }
     if (m_completed && m_tagColor.isEmpty()) {
-        tagColor = QColor(180, 190, 200);
+        tagColor = QColor(200, 205, 210);
     }
     painter.setBrush(tagColor);
     painter.setPen(Qt::NoPen);
@@ -456,7 +470,7 @@ void TodoListItem::paintEvent(QPaintEvent *event)
     titleFont.setPixelSize(13);
     titleFont.setBold(!m_completed);
     painter.setFont(titleFont);
-    painter.setPen(m_completed ? QColor(170, 180, 190) : QColor(31, 41, 55));
+    painter.setPen(m_completed ? QColor(180, 185, 190) : QColor(31, 41, 55));
     
     QFontMetrics fm(titleFont);
     QString elidedTitle = fm.elidedText(m_title, Qt::ElideRight, width() - 24);
@@ -628,13 +642,6 @@ void CalendarWidget::refreshCalendarData()
             QDate dueDate = item.getDueDate();
             if (dueDate.isValid()) {
                 m_dateToTodos[dueDate].append(item);
-            }
-            
-            QDate createdDate = item.getCreatedTime().date();
-            if (createdDate.isValid() && (!dueDate.isValid() || dueDate != createdDate)) {
-                if (!m_dateToTodos[createdDate].contains(item)) {
-                    m_dateToTodos[createdDate].append(item);
-                }
             }
         }
     }
