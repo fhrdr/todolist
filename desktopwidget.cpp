@@ -140,25 +140,14 @@ void DesktopWidget::updateTodoList()
     
     for (const TodoItem &item : m_displayItems) {
         QListWidgetItem *listItem = new QListWidgetItem();
-        
-        QString prefix = item.isCompleted() ? "✅ " : "⬜ ";
-        listItem->setText(prefix + item.getTitle());
+        listItem->setText(item.getTitle());
         listItem->setData(Qt::UserRole, item.getId());
-        
-        if (item.isCompleted()) {
-            listItem->setForeground(QColor(100, 116, 139));
-        } else {
-            listItem->setForeground(QColor(51, 65, 85));
-        }
+        listItem->setForeground(QColor(51, 65, 85));
         
         m_todoListWidget->addItem(listItem);
     }
     
-    int pendingCount = 0;
-    for (const TodoItem &item : m_displayItems) {
-        if (!item.isCompleted()) pendingCount++;
-    }
-    
+    int pendingCount = m_displayItems.size();
     m_countLabel->setText(QString("(%1)").arg(pendingCount));
 }
 

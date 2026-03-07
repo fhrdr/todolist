@@ -26,15 +26,15 @@ public:
                           index.data(Qt::ForegroundRole).value<QColor>() == QColor(156, 163, 175);
         
         if (isCompleted && !isSelected) {
-            painter->fillRect(option.rect, QColor(249, 250, 251));
+            painter->fillRect(option.rect, QColor(252, 252, 253));
         }
         if (isSelected) {
             painter->fillRect(option.rect, QColor(239, 246, 255));
         }
         
         if (isCompleted) {
-            painter->setPen(QPen(QColor(34, 197, 94), 2));
-            painter->setBrush(QColor(34, 197, 94));
+            painter->setPen(QPen(QColor(180, 190, 200), 1.5));
+            painter->setBrush(QColor(200, 210, 220));
             QRect checkRect(option.rect.left() + 12, option.rect.top() + 18, 16, 16);
             painter->drawRoundedRect(checkRect, 3, 3);
             
@@ -42,7 +42,7 @@ public:
             checkPath.moveTo(checkRect.left() + 3, checkRect.center().y());
             checkPath.lineTo(checkRect.center().x(), checkRect.bottom() - 3);
             checkPath.lineTo(checkRect.right() - 3, checkRect.top() + 3);
-            painter->setPen(QPen(Qt::white, 2));
+            painter->setPen(QPen(QColor(150, 160, 170), 2));
             painter->drawPath(checkPath);
         } else {
             painter->setPen(QPen(QColor(203, 213, 225), 2));
@@ -73,7 +73,7 @@ public:
         titleFont.setBold(!isCompleted);
         painter->setFont(titleFont);
         
-        QColor titleColor = isCompleted ? QColor(100, 116, 139) : QColor(30, 41, 59);
+        QColor titleColor = isCompleted ? QColor(170, 180, 190) : QColor(30, 41, 59);
         painter->setPen(titleColor);
         
         QFontMetrics fm(titleFont);
@@ -808,9 +808,6 @@ void MainWindow::onSaveClicked()
     m_currentItem->setDetails(ui->detailsEdit->toPlainText());
     m_currentItem->setCompleted(ui->completedCheckBox->isChecked());
     
-    if (ui->plannedDateEdit) {
-        m_currentItem->setPlannedDate(ui->plannedDateEdit->date());
-    }
     if (ui->dueDateEdit) {
         m_currentItem->setDueDate(ui->dueDateEdit->date());
     }
@@ -897,6 +894,7 @@ void MainWindow::onCompletedToggled(bool completed)
     }
     
     updateDetailPanel();
+    updateTodoTags();
 }
 
 void MainWindow::onSyncClicked()
@@ -1103,15 +1101,6 @@ void MainWindow::updateDetailPanel()
     
     ui->completedCheckBox->setChecked(m_currentItem->isCompleted());
     
-    if (ui->plannedDateEdit) {
-        if (m_currentItem->getPlannedDate().isValid()) {
-            ui->plannedDateEdit->setDate(m_currentItem->getPlannedDate());
-        } else {
-            ui->plannedDateEdit->setDate(QDate::currentDate());
-        }
-        ui->plannedDateEdit->setEnabled(true);
-    }
-    
     if (ui->dueDateEdit) {
         if (m_currentItem->getDueDate().isValid()) {
             ui->dueDateEdit->setDate(m_currentItem->getDueDate());
@@ -1168,10 +1157,6 @@ void MainWindow::clearDetailPanel()
     ui->completedTimeLabel->setVisible(false);
     ui->completedCheckBox->setChecked(false);
     
-    if (ui->plannedDateEdit) {
-        ui->plannedDateEdit->setDate(QDate::currentDate());
-        ui->plannedDateEdit->setEnabled(false);
-    }
     if (ui->dueDateEdit) {
         ui->dueDateEdit->setDate(QDate::currentDate());
         ui->dueDateEdit->setEnabled(false);
@@ -1320,7 +1305,7 @@ void MainWindow::updateCalendarWidget()
 void MainWindow::onCalendarTodoAdded(const QString &title, const QDate &date)
 {
     TodoItem todoItem(title);
-    todoItem.setPlannedDate(date);
+    todoItem.setDueDate(date);
     
     QString dateFolderName = date.toString("yyyy-MM-dd");
     
@@ -1371,13 +1356,19 @@ void MainWindow::setupTagWidget()
     connect(m_tagWidget, &TagWidget::todoClicked, [this](const QString &todoId, const QString &folderId) {
         for (int i = 0; i < m_folders.size(); ++i) {
             if (m_folders[i].getId() == folderId) {
+                m_currentFolder = &m_folders[i];
                 ui->folderListWidget->setCurrentRow(i);
-                QList<TodoItem> items = m_folders[i].getItems();
-                for (int j = 0; j < items.size(); ++j) {
-                    if (items[j].getId() == todoId) {
-                        ui->todoListWidget->setCurrentRow(j);
-                        break;
+                TodoItem* item = m_currentFolder->findItem(todoId);
+                if (item) {
+                    m_currentItem = item;
+                    QList<TodoItem> items = m_folders[i].getItems();
+                    for (int j = 0; j < items.size(); ++j) {
+                        if (items[j].getId() == todoId) {
+                            ui->todoListWidget->setCurrentRow(j);
+                            break;
+                        }
                     }
+                    updateDetailPanel();
                 }
                 break;
             }
@@ -1385,23 +1376,15 @@ void MainWindow::setupTagWidget()
         ui->tabWidget->setCurrentIndex(0);
     });
     connect(m_tagWidget, &TagWidget::todoToggled, [this](const QString &todoId, bool completed) {
-        for (TodoFolder &folder : m_folders) {
-            TodoItem *item = folder.findItem(todoId);
-            if (item) {
-                item->setCompleted(completed);
-                saveData();
-                updateTodoList();
-                updateFolderList();
-                updateCalendarWidget();
-                updateTagWidget();
-                updateDesktopWidget();
-                break;
-            }
-        }
+        toggleTodoCompleted(todoId, completed);
     });
     connect(m_tagWidget, &TagWidget::tagCreated, [this](const QString &tag) {
-        Q_UNUSED(tag)
-        updateTagWidget();
+        if (m_currentItem) {
+            m_currentItem->addTag(tag);
+            saveData();
+            updateTodoTags();
+            updateTagWidget();
+        }
     });
     connect(m_tagWidget, &TagWidget::tagDeleted, [this](const QString &tag) {
         for (TodoFolder &folder : m_folders) {
@@ -1454,11 +1437,34 @@ bool MainWindow::toggleTodoCompleted(const QString &itemId, bool completed)
     item->setCompleted(completed);
     saveData();
     
-    if (m_currentItem && m_currentItem->getId() == itemId) {
-        m_currentItem = item;
-    }
+    bool wasCurrentItem = (m_currentItem && m_currentItem->getId() == itemId);
+    bool wasCurrentFolder = (m_currentFolder && m_currentFolder->getId() == folderId);
+    
+    m_currentItem = nullptr;
+    m_currentFolder = nullptr;
     
     refreshAllViews();
+    
+    if (wasCurrentFolder && wasCurrentItem) {
+        for (int i = 0; i < m_folders.size(); ++i) {
+            if (m_folders[i].getId() == folderId) {
+                m_currentFolder = &m_folders[i];
+                TodoItem* foundItem = m_currentFolder->findItem(itemId);
+                if (foundItem) {
+                    m_currentItem = foundItem;
+                    ui->folderListWidget->setCurrentRow(i);
+                    for (int j = 0; j < ui->todoListWidget->count(); ++j) {
+                        if (ui->todoListWidget->item(j)->data(Qt::UserRole).toString() == itemId) {
+                            ui->todoListWidget->setCurrentRow(j);
+                            break;
+                        }
+                    }
+                }
+                break;
+            }
+        }
+        updateDetailPanel();
+    }
     
     return true;
 }

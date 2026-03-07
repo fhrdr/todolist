@@ -81,7 +81,7 @@ private:
     QString m_details;
     QString m_folderName;
     bool m_completed;
-    QDate m_plannedDate;
+    QDate m_dueDate;
     QString m_tagColor;
     QStringList m_tags;
 };

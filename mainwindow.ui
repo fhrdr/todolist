@@ -364,29 +364,6 @@
                 </widget>
                </item>
                <item>
-                <widget class="QLabel" name="plannedDateLabel">
-                 <property name="text">
-                  <string>计划日期</string>
-                 </property>
-                 <property name="styleSheet">
-                  <string notr="true">font-weight: 500; font-size: 12px; color: #64748b;</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QDateEdit" name="plannedDateEdit">
-                 <property name="calendarPopup">
-                  <bool>true</bool>
-                 </property>
-                 <property name="displayFormat">
-                  <string>yyyy-MM-dd</string>
-                 </property>
-                 <property name="specialValueText">
-                  <string>未设置</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
                 <widget class="QLabel" name="dueDateLabel">
                  <property name="text">
                   <string>截止日期</string>

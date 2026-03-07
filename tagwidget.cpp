@@ -40,9 +40,9 @@ void TagCloudItem::paintEvent(QPaintEvent *event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     
-    QColor bgColor(238, 242, 255);
-    QColor borderColor(165, 180, 252);
-    QColor textColor(79, 70, 229);
+    QColor bgColor(241, 245, 249);
+    QColor borderColor(203, 213, 225);
+    QColor textColor(51, 65, 85);
     
     painter.setPen(Qt::NoPen);
     painter.setBrush(bgColor);
@@ -92,7 +92,7 @@ void TagListItem::paintEvent(QPaintEvent *event)
     
     painter.fillRect(rect(), QColor(255, 255, 255));
     
-    QColor tagColor(99, 102, 241);
+    QColor tagColor(148, 163, 184);
     painter.setPen(Qt::NoPen);
     painter.setBrush(tagColor);
     painter.drawRoundedRect(16, 12, 4, height() - 24, 2, 2);
@@ -123,7 +123,7 @@ TodoItemWidget::TodoItemWidget(const TodoItem &item, const QString &folderName, 
     , m_details(item.getDetails())
     , m_folderName(folderName)
     , m_completed(item.isCompleted())
-    , m_plannedDate(item.getPlannedDate())
+    , m_dueDate(item.getDueDate())
     , m_tagColor(item.getTagColor())
     , m_tags(item.getTags())
 {
@@ -157,12 +157,12 @@ void TodoItemWidget::paintEvent(QPaintEvent *event)
     painter.setRenderHint(QPainter::Antialiasing);
     
     if (m_completed) {
-        painter.fillRect(rect(), QColor(249, 250, 251));
+        painter.fillRect(rect(), QColor(252, 252, 253));
     } else {
         painter.fillRect(rect(), QColor(255, 255, 255));
     }
     
-    QColor checkColor = m_completed ? QColor(34, 197, 94) : QColor(203, 213, 225);
+    QColor checkColor = m_completed ? QColor(180, 190, 200) : QColor(203, 213, 225);
     QColor checkBg = QColor(255, 255, 255);
     
     QRect checkRect(16, 14, 18, 18);
@@ -178,7 +178,7 @@ void TodoItemWidget::paintEvent(QPaintEvent *event)
         checkPath.moveTo(checkRect.left() + 4, checkRect.center().y());
         checkPath.lineTo(checkRect.center().x(), checkRect.bottom() - 4);
         checkPath.lineTo(checkRect.right() - 4, checkRect.top() + 4);
-        painter.setPen(QPen(checkColor, 2));
+        painter.setPen(QPen(QColor(150, 160, 170), 2));
         painter.drawPath(checkPath);
     }
     
@@ -186,7 +186,7 @@ void TodoItemWidget::paintEvent(QPaintEvent *event)
     titleFont.setPixelSize(15);
     titleFont.setBold(!m_completed);
     painter.setFont(titleFont);
-    painter.setPen(m_completed ? QColor(100, 116, 139) : QColor(30, 41, 59));
+    painter.setPen(m_completed ? QColor(170, 180, 190) : QColor(30, 41, 59));
     
     QFontMetrics fm(titleFont);
     QString elidedTitle = fm.elidedText(m_title, Qt::ElideRight, width() - 120);
@@ -207,8 +207,8 @@ void TodoItemWidget::paintEvent(QPaintEvent *event)
     painter.setPen(QColor(100, 116, 139));
     
     QString infoText;
-    if (m_plannedDate.isValid()) {
-        infoText = m_plannedDate.toString("MM-dd");
+    if (m_dueDate.isValid()) {
+        infoText = m_dueDate.toString("MM-dd");
     }
     if (!m_folderName.isEmpty()) {
         if (!infoText.isEmpty()) infoText += " · ";
@@ -308,13 +308,18 @@ void TagWidget::setupUI()
     m_addLineEdit->setStyleSheet(
         "QLineEdit { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; "
         "padding: 8px 12px; color: #334155; font-size: 13px; }"
-        "QLineEdit:focus { border-color: #6366f1; background-color: #ffffff; }"
+        "QLineEdit:focus { border-color: #94a3b8; background-color: #ffffff; }"
         "QLineEdit::placeholder { color: #94a3b8; }"
     );
     m_addLayout->addWidget(m_addLineEdit, 1);
     
     m_addButton = new QPushButton("添加");
-    m_addButton->setObjectName("newTodoBtn");
+    m_addButton->setStyleSheet(
+        "QPushButton { background-color: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; "
+        "padding: 8px 16px; color: #475569; font-size: 13px; font-weight: 500; }"
+        "QPushButton:hover { background-color: #e2e8f0; border-color: #cbd5e1; }"
+        "QPushButton:pressed { background-color: #cbd5e1; }"
+    );
     m_addLayout->addWidget(m_addButton);
     
     m_listLayout->addWidget(m_addPanel);
