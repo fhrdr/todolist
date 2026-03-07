@@ -156,7 +156,11 @@ void TodoItemWidget::paintEvent(QPaintEvent *event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     
-    painter.fillRect(rect(), QColor(255, 255, 255));
+    if (m_completed) {
+        painter.fillRect(rect(), QColor(249, 250, 251));
+    } else {
+        painter.fillRect(rect(), QColor(255, 255, 255));
+    }
     
     QColor checkColor = m_completed ? QColor(34, 197, 94) : QColor(203, 213, 225);
     QColor checkBg = QColor(255, 255, 255);
@@ -180,12 +184,9 @@ void TodoItemWidget::paintEvent(QPaintEvent *event)
     
     QFont titleFont;
     titleFont.setPixelSize(15);
-    titleFont.setBold(true);
-    if (m_completed) {
-        titleFont.setStrikeOut(true);
-    }
+    titleFont.setBold(!m_completed);
     painter.setFont(titleFont);
-    painter.setPen(m_completed ? QColor(148, 163, 184) : QColor(30, 41, 59));
+    painter.setPen(m_completed ? QColor(100, 116, 139) : QColor(30, 41, 59));
     
     QFontMetrics fm(titleFont);
     QString elidedTitle = fm.elidedText(m_title, Qt::ElideRight, width() - 120);

@@ -141,18 +141,15 @@ void DesktopWidget::updateTodoList()
     for (const TodoItem &item : m_displayItems) {
         QListWidgetItem *listItem = new QListWidgetItem();
         
-        QString prefix = item.isCompleted() ? "✓ " : "○ ";
+        QString prefix = item.isCompleted() ? "✅ " : "⬜ ";
         listItem->setText(prefix + item.getTitle());
         listItem->setData(Qt::UserRole, item.getId());
         
-        QFont font = listItem->font();
         if (item.isCompleted()) {
-            font.setStrikeOut(true);
             listItem->setForeground(QColor(100, 116, 139));
         } else {
             listItem->setForeground(QColor(51, 65, 85));
         }
-        listItem->setFont(font);
         
         m_todoListWidget->addItem(listItem);
     }

@@ -13,6 +13,8 @@
 #include <QtGui/QAction>
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QCheckBox>
+#include <QtWidgets/QComboBox>
+#include <QtWidgets/QDateEdit>
 #include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QLineEdit>
@@ -63,10 +65,25 @@ public:
     QScrollArea *detailScrollArea;
     QWidget *detailContent;
     QVBoxLayout *detailContentLayout;
+    QLabel *emptyStateLabel;
     QLabel *titleLabel;
     QLineEdit *titleEdit;
     QLabel *detailsLabel;
     QTextEdit *detailsEdit;
+    QLabel *plannedDateLabel;
+    QDateEdit *plannedDateEdit;
+    QLabel *dueDateLabel;
+    QDateEdit *dueDateEdit;
+    QLabel *priorityLabel;
+    QComboBox *priorityComboBox;
+    QLabel *tagColorLabel;
+    QComboBox *tagColorComboBox;
+    QLabel *tagsLabel;
+    QWidget *tagsWidget;
+    QHBoxLayout *tagsLayout;
+    QLabel *tagsDisplayLabel;
+    QPushButton *addTagBtn;
+    QSpacerItem *tagsSpacer;
     QLabel *timeLabel;
     QLabel *createdTimeLabel;
     QLabel *completedTimeLabel_title;
@@ -232,6 +249,14 @@ public:
         detailContentLayout->setSpacing(16);
         detailContentLayout->setObjectName("detailContentLayout");
         detailContentLayout->setContentsMargins(0, 0, 0, 0);
+        emptyStateLabel = new QLabel(detailContent);
+        emptyStateLabel->setObjectName("emptyStateLabel");
+        emptyStateLabel->setAlignment(Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop);
+        emptyStateLabel->setWordWrap(true);
+        emptyStateLabel->setStyleSheet(QString::fromUtf8("color: #94a3b8; font-size: 13px; padding: 20px; background-color: #f8fafc; border-radius: 8px;"));
+
+        detailContentLayout->addWidget(emptyStateLabel);
+
         titleLabel = new QLabel(detailContent);
         titleLabel->setObjectName("titleLabel");
         titleLabel->setStyleSheet(QString::fromUtf8("font-weight: 500; font-size: 12px; color: #64748b;"));
@@ -251,9 +276,97 @@ public:
 
         detailsEdit = new QTextEdit(detailContent);
         detailsEdit->setObjectName("detailsEdit");
-        detailsEdit->setMinimumSize(QSize(0, 100));
+        detailsEdit->setMinimumSize(QSize(0, 80));
 
         detailContentLayout->addWidget(detailsEdit);
+
+        plannedDateLabel = new QLabel(detailContent);
+        plannedDateLabel->setObjectName("plannedDateLabel");
+        plannedDateLabel->setStyleSheet(QString::fromUtf8("font-weight: 500; font-size: 12px; color: #64748b;"));
+
+        detailContentLayout->addWidget(plannedDateLabel);
+
+        plannedDateEdit = new QDateEdit(detailContent);
+        plannedDateEdit->setObjectName("plannedDateEdit");
+        plannedDateEdit->setCalendarPopup(true);
+
+        detailContentLayout->addWidget(plannedDateEdit);
+
+        dueDateLabel = new QLabel(detailContent);
+        dueDateLabel->setObjectName("dueDateLabel");
+        dueDateLabel->setStyleSheet(QString::fromUtf8("font-weight: 500; font-size: 12px; color: #64748b;"));
+
+        detailContentLayout->addWidget(dueDateLabel);
+
+        dueDateEdit = new QDateEdit(detailContent);
+        dueDateEdit->setObjectName("dueDateEdit");
+        dueDateEdit->setCalendarPopup(true);
+
+        detailContentLayout->addWidget(dueDateEdit);
+
+        priorityLabel = new QLabel(detailContent);
+        priorityLabel->setObjectName("priorityLabel");
+        priorityLabel->setStyleSheet(QString::fromUtf8("font-weight: 500; font-size: 12px; color: #64748b;"));
+
+        detailContentLayout->addWidget(priorityLabel);
+
+        priorityComboBox = new QComboBox(detailContent);
+        priorityComboBox->addItem(QString());
+        priorityComboBox->addItem(QString());
+        priorityComboBox->addItem(QString());
+        priorityComboBox->setObjectName("priorityComboBox");
+
+        detailContentLayout->addWidget(priorityComboBox);
+
+        tagColorLabel = new QLabel(detailContent);
+        tagColorLabel->setObjectName("tagColorLabel");
+        tagColorLabel->setStyleSheet(QString::fromUtf8("font-weight: 500; font-size: 12px; color: #64748b;"));
+
+        detailContentLayout->addWidget(tagColorLabel);
+
+        tagColorComboBox = new QComboBox(detailContent);
+        tagColorComboBox->addItem(QString());
+        tagColorComboBox->addItem(QString());
+        tagColorComboBox->addItem(QString());
+        tagColorComboBox->addItem(QString());
+        tagColorComboBox->addItem(QString());
+        tagColorComboBox->addItem(QString());
+        tagColorComboBox->setObjectName("tagColorComboBox");
+
+        detailContentLayout->addWidget(tagColorComboBox);
+
+        tagsLabel = new QLabel(detailContent);
+        tagsLabel->setObjectName("tagsLabel");
+        tagsLabel->setStyleSheet(QString::fromUtf8("font-weight: 500; font-size: 12px; color: #64748b;"));
+
+        detailContentLayout->addWidget(tagsLabel);
+
+        tagsWidget = new QWidget(detailContent);
+        tagsWidget->setObjectName("tagsWidget");
+        tagsWidget->setMinimumSize(QSize(0, 32));
+        tagsLayout = new QHBoxLayout(tagsWidget);
+        tagsLayout->setSpacing(4);
+        tagsLayout->setObjectName("tagsLayout");
+        tagsLayout->setContentsMargins(0, 0, 0, 0);
+        tagsDisplayLabel = new QLabel(tagsWidget);
+        tagsDisplayLabel->setObjectName("tagsDisplayLabel");
+        tagsDisplayLabel->setStyleSheet(QString::fromUtf8("color: #94a3b8; font-size: 12px;"));
+
+        tagsLayout->addWidget(tagsDisplayLabel);
+
+        addTagBtn = new QPushButton(tagsWidget);
+        addTagBtn->setObjectName("addTagBtn");
+        addTagBtn->setMinimumSize(QSize(24, 24));
+        addTagBtn->setMaximumSize(QSize(24, 24));
+
+        tagsLayout->addWidget(addTagBtn);
+
+        tagsSpacer = new QSpacerItem(40, 20, QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Minimum);
+
+        tagsLayout->addItem(tagsSpacer);
+
+
+        detailContentLayout->addWidget(tagsWidget);
 
         timeLabel = new QLabel(detailContent);
         timeLabel->setObjectName("timeLabel");
@@ -400,10 +513,41 @@ public:
         syncBtn->setToolTip(QCoreApplication::translate("MainWindow", "\345\220\214\346\255\245\346\225\260\346\215\256", nullptr));
 #endif // QT_CONFIG(tooltip)
         detailLabel->setText(QCoreApplication::translate("MainWindow", "\350\257\246\346\203\205", nullptr));
+        emptyStateLabel->setText(QCoreApplication::translate("MainWindow", "\350\257\267\351\200\211\346\213\251\344\270\200\344\270\252\345\276\205\345\212\236\344\272\213\351\241\271\346\237\245\347\234\213\350\257\246\346\203\205\n"
+"\n"
+"\360\237\222\241 \346\217\220\347\244\272\357\274\232\n"
+"\342\200\242 \347\202\271\345\207\273\345\267\246\344\276\247\345\276\205\345\212\236\344\272\213\351\241\271\346\237\245\347\234\213\350\257\246\346\203\205\n"
+"\342\200\242 \347\202\271\345\207\273\"\346\226\260\345\273\272\"\345\210\233\345\273\272\346\226\260\347\232\204\345\276\205\345\212\236\344\272\213\351\241\271\n"
+"\342\200\242 \345\217\214\345\207\273\345\276\205\345\212\236\344\272\213\351\241\271\345\217\257\345\277\253\351\200\237\347\274\226\350\276\221", nullptr));
         titleLabel->setText(QCoreApplication::translate("MainWindow", "\346\240\207\351\242\230", nullptr));
         titleEdit->setPlaceholderText(QCoreApplication::translate("MainWindow", "\350\257\267\350\276\223\345\205\245\346\240\207\351\242\230", nullptr));
         detailsLabel->setText(QCoreApplication::translate("MainWindow", "\350\257\246\346\203\205", nullptr));
         detailsEdit->setPlaceholderText(QCoreApplication::translate("MainWindow", "\350\257\267\350\276\223\345\205\245\350\257\246\347\273\206\346\217\217\350\277\260", nullptr));
+        plannedDateLabel->setText(QCoreApplication::translate("MainWindow", "\350\256\241\345\210\222\346\227\245\346\234\237", nullptr));
+        plannedDateEdit->setDisplayFormat(QCoreApplication::translate("MainWindow", "yyyy-MM-dd", nullptr));
+        plannedDateEdit->setSpecialValueText(QCoreApplication::translate("MainWindow", "\346\234\252\350\256\276\347\275\256", nullptr));
+        dueDateLabel->setText(QCoreApplication::translate("MainWindow", "\346\210\252\346\255\242\346\227\245\346\234\237", nullptr));
+        dueDateEdit->setDisplayFormat(QCoreApplication::translate("MainWindow", "yyyy-MM-dd", nullptr));
+        dueDateEdit->setSpecialValueText(QCoreApplication::translate("MainWindow", "\346\234\252\350\256\276\347\275\256", nullptr));
+        priorityLabel->setText(QCoreApplication::translate("MainWindow", "\344\274\230\345\205\210\347\272\247", nullptr));
+        priorityComboBox->setItemText(0, QCoreApplication::translate("MainWindow", "\344\275\216\344\274\230\345\205\210\347\272\247", nullptr));
+        priorityComboBox->setItemText(1, QCoreApplication::translate("MainWindow", "\344\270\255\344\274\230\345\205\210\347\272\247", nullptr));
+        priorityComboBox->setItemText(2, QCoreApplication::translate("MainWindow", "\351\253\230\344\274\230\345\205\210\347\272\247", nullptr));
+
+        tagColorLabel->setText(QCoreApplication::translate("MainWindow", "\346\240\207\347\255\276\351\242\234\350\211\262", nullptr));
+        tagColorComboBox->setItemText(0, QCoreApplication::translate("MainWindow", "\350\223\235\350\211\262", nullptr));
+        tagColorComboBox->setItemText(1, QCoreApplication::translate("MainWindow", "\347\273\277\350\211\262", nullptr));
+        tagColorComboBox->setItemText(2, QCoreApplication::translate("MainWindow", "\347\272\242\350\211\262", nullptr));
+        tagColorComboBox->setItemText(3, QCoreApplication::translate("MainWindow", "\346\251\231\350\211\262", nullptr));
+        tagColorComboBox->setItemText(4, QCoreApplication::translate("MainWindow", "\347\264\253\350\211\262", nullptr));
+        tagColorComboBox->setItemText(5, QCoreApplication::translate("MainWindow", "\351\235\222\350\211\262", nullptr));
+
+        tagsLabel->setText(QCoreApplication::translate("MainWindow", "\346\240\207\347\255\276", nullptr));
+        tagsDisplayLabel->setText(QCoreApplication::translate("MainWindow", "\346\227\240\346\240\207\347\255\276", nullptr));
+        addTagBtn->setText(QCoreApplication::translate("MainWindow", "+", nullptr));
+#if QT_CONFIG(tooltip)
+        addTagBtn->setToolTip(QCoreApplication::translate("MainWindow", "\346\267\273\345\212\240\346\240\207\347\255\276", nullptr));
+#endif // QT_CONFIG(tooltip)
         timeLabel->setText(QCoreApplication::translate("MainWindow", "\345\210\233\345\273\272\346\227\266\351\227\264", nullptr));
         createdTimeLabel->setText(QCoreApplication::translate("MainWindow", "-", nullptr));
         completedTimeLabel_title->setText(QCoreApplication::translate("MainWindow", "\345\256\214\346\210\220\346\227\266\351\227\264", nullptr));

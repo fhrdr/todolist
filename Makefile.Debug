@@ -20,7 +20,7 @@ INCPATH       = -I. -ID:/Qt/qt6/6.8.3/mingw_64/include -ID:/Qt/qt6/6.8.3/mingw_6
 LINKER      =        g++
 LFLAGS        =        -Wl,-subsystem,windows -mthreads
 LIBS        =        D:\Qt\qt6\6.8.3\mingw_64\lib\libQt6Widgets.a D:\Qt\qt6\6.8.3\mingw_64\lib\libQt6Gui.a D:\Qt\qt6\6.8.3\mingw_64\lib\libQt6Sql.a D:\Qt\qt6\6.8.3\mingw_64\lib\libQt6Core.a debug\todolist_resource_res.o -lmingw32 D:\Qt\qt6\6.8.3\mingw_64\lib\libQt6EntryPoint.a -lshell32  
-QMAKE         = D:\Qt\qt6\6.8.3\mingw_64\bin\qmake.exe
+QMAKE         = D:\Qt\qt6\6.8.3\mingw_64\bin\qmake6.exe
 DEL_FILE      = del
 CHK_DIR_EXISTS= if not exist
 MKDIR         = mkdir
@@ -30,8 +30,8 @@ COPY_DIR      = xcopy /s /q /y /i
 INSTALL_FILE  = copy /y
 INSTALL_PROGRAM = copy /y
 INSTALL_DIR   = xcopy /s /q /y /i
-QINSTALL      = D:\Qt\qt6\6.8.3\mingw_64\bin\qmake.exe -install qinstall
-QINSTALL_PROGRAM = D:\Qt\qt6\6.8.3\mingw_64\bin\qmake.exe -install qinstall -exe
+QINSTALL      = D:\Qt\qt6\6.8.3\mingw_64\bin\qmake6.exe -install qinstall
+QINSTALL_PROGRAM = D:\Qt\qt6\6.8.3\mingw_64\bin\qmake6.exe -install qinstall -exe
 DEL_FILE      = del
 SYMLINK       = $(QMAKE) -install ln -f -s
 DEL_DIR       = rmdir
@@ -105,7 +105,7 @@ debug/todolist_resource_res.o: todolist_resource.rc
 	windres -i todolist_resource.rc -o debug\todolist_resource_res.o --include-dir=. $(DEFINES)
 
 qmake: FORCE
-	@$(QMAKE) -o Makefile.Debug todolist.pro -spec win32-g++ "CONFIG+=release"
+	@$(QMAKE) -o Makefile.Debug todolist.pro
 
 qmake_all: FORCE
 
@@ -1848,7 +1848,9 @@ debug/mainwindow.o: mainwindow.cpp mainwindow.h \
 		D:/Qt/qt6/6.8.3/mingw_64/include/QtSql/QSqlQuery \
 		D:/Qt/qt6/6.8.3/mingw_64/include/QtSql/qsqlquery.h \
 		D:/Qt/qt6/6.8.3/mingw_64/include/QtSql/QSqlError \
-		D:/Qt/qt6/6.8.3/mingw_64/include/QtSql/qsqlerror.h
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtSql/qsqlerror.h \
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtWidgets/QStyledItemDelegate \
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtWidgets/qstyleditemdelegate.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o debug\mainwindow.o mainwindow.cpp
 
 debug/todoitem.o: todoitem.cpp todoitem.h \

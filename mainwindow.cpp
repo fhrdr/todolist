@@ -22,8 +22,33 @@ public:
         painter->setRenderHint(QPainter::Antialiasing);
         
         bool isSelected = option.state & QStyle::State_Selected;
+        bool isCompleted = index.data(Qt::ForegroundRole).isValid() && 
+                          index.data(Qt::ForegroundRole).value<QColor>() == QColor(156, 163, 175);
+        
+        if (isCompleted && !isSelected) {
+            painter->fillRect(option.rect, QColor(249, 250, 251));
+        }
         if (isSelected) {
             painter->fillRect(option.rect, QColor(239, 246, 255));
+        }
+        
+        if (isCompleted) {
+            painter->setPen(QPen(QColor(34, 197, 94), 2));
+            painter->setBrush(QColor(34, 197, 94));
+            QRect checkRect(option.rect.left() + 12, option.rect.top() + 18, 16, 16);
+            painter->drawRoundedRect(checkRect, 3, 3);
+            
+            QPainterPath checkPath;
+            checkPath.moveTo(checkRect.left() + 3, checkRect.center().y());
+            checkPath.lineTo(checkRect.center().x(), checkRect.bottom() - 3);
+            checkPath.lineTo(checkRect.right() - 3, checkRect.top() + 3);
+            painter->setPen(QPen(Qt::white, 2));
+            painter->drawPath(checkPath);
+        } else {
+            painter->setPen(QPen(QColor(203, 213, 225), 2));
+            painter->setBrush(Qt::NoBrush);
+            QRect checkRect(option.rect.left() + 12, option.rect.top() + 18, 16, 16);
+            painter->drawRoundedRect(checkRect, 3, 3);
         }
         
         QString text = index.data(Qt::DisplayRole).toString();
@@ -41,20 +66,14 @@ public:
             title = titleLine;
         }
         
-        bool isCompleted = index.data(Qt::ForegroundRole).isValid() && 
-                          index.data(Qt::ForegroundRole).value<QColor>() == QColor(156, 163, 175);
-        
-        QRect rect = option.rect.adjusted(12, 6, -12, -6);
+        QRect rect = option.rect.adjusted(36, 6, -12, -6);
         
         QFont titleFont;
         titleFont.setPixelSize(14);
-        titleFont.setBold(true);
-        if (isCompleted) {
-            titleFont.setStrikeOut(true);
-        }
+        titleFont.setBold(!isCompleted);
         painter->setFont(titleFont);
         
-        QColor titleColor = isCompleted ? QColor(156, 163, 175) : QColor(30, 41, 59);
+        QColor titleColor = isCompleted ? QColor(100, 116, 139) : QColor(30, 41, 59);
         painter->setPen(titleColor);
         
         QFontMetrics fm(titleFont);
@@ -67,7 +86,7 @@ public:
             QFont dateFont;
             dateFont.setPixelSize(12);
             painter->setFont(dateFont);
-            painter->setPen(QColor(100, 116, 139));
+            painter->setPen(isCompleted ? QColor(156, 163, 175) : QColor(100, 116, 139));
             painter->drawText(QRect(rect.right() - dateWidth + 10, rect.top(), dateWidth, 22), Qt::AlignRight | Qt::AlignVCenter, date);
         }
         
@@ -471,6 +490,32 @@ void MainWindow::setupConnections()
     connect(ui->completedCheckBox, &QCheckBox::toggled, this, &MainWindow::onCompletedToggled);
     connect(ui->syncBtn, &QPushButton::clicked, this, &MainWindow::onSyncClicked);
     
+    connect(ui->addTagBtn, &QPushButton::clicked, this, [this]() {
+        if (!m_currentItem) return;
+        
+        QSet<QString> existingTags;
+        for (const TodoFolder &folder : m_folders) {
+            for (const TodoItem &item : folder.getItems()) {
+                for (const QString &tag : item.getTags()) {
+                    existingTags.insert(tag);
+                }
+            }
+        }
+        
+        QStringList sortedTags = existingTags.values();
+        std::sort(sortedTags.begin(), sortedTags.end());
+        
+        bool ok;
+        QString newTag = QInputDialog::getItem(this, "添加标签", "选择或输入标签:", sortedTags, 0, true, &ok);
+        
+        if (ok && !newTag.trimmed().isEmpty()) {
+            m_currentItem->addTag(newTag.trimmed());
+            updateTodoTags();
+            updateTagWidget();
+            saveData();
+        }
+    });
+    
     connect(ui->actionImport, &QAction::triggered, this, &MainWindow::onImportClicked);
     connect(ui->actionExport, &QAction::triggered, this, &MainWindow::onExportClicked);
     connect(ui->actionExit, &QAction::triggered, this, &MainWindow::onExitClicked);
@@ -605,6 +650,22 @@ void MainWindow::onFolderContextMenu(const QPoint &pos)
     QMenu menu(this);
     QAction *pinAction = menu.addAction(m_currentFolder->isPinned() ? "取消置顶" : "置顶");
     QAction *renameAction = menu.addAction("重命名");
+    
+    QMenu *colorMenu = menu.addMenu("设置颜色");
+    QStringList colorNames = {"蓝色", "绿色", "红色", "橙色", "紫色", "青色"};
+    QStringList colorValues = {"#3b82f6", "#10b981", "#ef4444", "#f59e0b", "#8b5cf6", "#06b6d4"};
+    for (int i = 0; i < colorNames.size(); ++i) {
+        QAction *colorAction = colorMenu->addAction(colorNames[i]);
+        connect(colorAction, &QAction::triggered, this, [this, colorValues, i]() {
+            if (m_currentFolder) {
+                m_currentFolder->setColor(colorValues[i]);
+                updateFolderList();
+                saveData();
+            }
+        });
+    }
+    
+    menu.addSeparator();
     QAction *deleteAction = menu.addAction("删除");
     
     connect(pinAction, &QAction::triggered, this, &MainWindow::onPinFolderClicked);
@@ -747,6 +808,23 @@ void MainWindow::onSaveClicked()
     m_currentItem->setDetails(ui->detailsEdit->toPlainText());
     m_currentItem->setCompleted(ui->completedCheckBox->isChecked());
     
+    if (ui->plannedDateEdit) {
+        m_currentItem->setPlannedDate(ui->plannedDateEdit->date());
+    }
+    if (ui->dueDateEdit) {
+        m_currentItem->setDueDate(ui->dueDateEdit->date());
+    }
+    if (ui->priorityComboBox) {
+        m_currentItem->setPriority(ui->priorityComboBox->currentIndex());
+    }
+    if (ui->tagColorComboBox) {
+        QStringList colors = {"#3b82f6", "#10b981", "#ef4444", "#f59e0b", "#8b5cf6", "#06b6d4"};
+        int index = ui->tagColorComboBox->currentIndex();
+        if (index >= 0 && index < colors.size()) {
+            m_currentItem->setTagColor(colors[index]);
+        }
+    }
+    
     updateTodoList();
     updateFolderList();
     updateCalendarWidget();
@@ -783,15 +861,42 @@ void MainWindow::onDeleteClicked()
 
 void MainWindow::onCompletedToggled(bool completed)
 {
-    if (m_currentItem) {
-        m_currentItem->setCompleted(completed);
-        updateTodoList();
-        updateFolderList();
-        updateCalendarWidget();
-        updateTagWidget();
-        updateDesktopWidget();
-        saveData();
+    if (!m_currentItem) return;
+    
+    QString currentItemId = m_currentItem->getId();
+    QString currentFolderId = m_currentFolder ? m_currentFolder->getId() : "";
+    
+    m_currentItem->setCompleted(completed);
+    saveData();
+    
+    m_currentFolder = nullptr;
+    m_currentItem = nullptr;
+    
+    updateFolderList();
+    updateTodoList();
+    updateCalendarWidget();
+    updateTagWidget();
+    updateDesktopWidget();
+    
+    for (int i = 0; i < m_folders.size(); ++i) {
+        if (m_folders[i].getId() == currentFolderId) {
+            m_currentFolder = &m_folders[i];
+            TodoItem* item = m_currentFolder->findItem(currentItemId);
+            if (item) {
+                m_currentItem = item;
+                ui->folderListWidget->setCurrentRow(i);
+                for (int j = 0; j < ui->todoListWidget->count(); ++j) {
+                    if (ui->todoListWidget->item(j)->data(Qt::UserRole).toString() == currentItemId) {
+                        ui->todoListWidget->setCurrentRow(j);
+                        break;
+                    }
+                }
+            }
+            break;
+        }
     }
+    
+    updateDetailPanel();
 }
 
 void MainWindow::onSyncClicked()
@@ -863,6 +968,13 @@ void MainWindow::updateFolderList()
         
         QListWidgetItem *item = new QListWidgetItem(displayText);
         item->setData(Qt::UserRole, folder.getId());
+        
+        QString folderColor = folder.getColor();
+        if (!folderColor.isEmpty()) {
+            QColor color(folderColor);
+            item->setForeground(color);
+        }
+        
         ui->folderListWidget->addItem(item);
         
         if (folder.getId() == currentFolderId) {
@@ -905,7 +1017,15 @@ void MainWindow::updateTodoList()
         if (item.isPinned()) {
             displayText = "📌 ";
         }
-        displayText += item.getTitle();
+        
+        QString priorityIcon;
+        int priority = item.getPriority();
+        if (priority == 2) {
+            priorityIcon = "🔴 ";
+        } else if (priority == 1) {
+            priorityIcon = "🟡 ";
+        }
+        displayText = priorityIcon + displayText + item.getTitle();
         
         QString subText;
         if (!item.getDetails().isEmpty()) {
@@ -916,7 +1036,14 @@ void MainWindow::updateTodoList()
         }
         
         QString dateText;
-        if (item.getPlannedDate().isValid()) {
+        if (item.getDueDate().isValid()) {
+            QDate today = QDate::currentDate();
+            if (item.getDueDate() < today && !item.isCompleted()) {
+                dateText = "⚠ " + item.getDueDate().toString("MM-dd");
+            } else {
+                dateText = item.getDueDate().toString("MM-dd");
+            }
+        } else if (item.getPlannedDate().isValid()) {
             dateText = item.getPlannedDate().toString("MM-dd");
         }
         
@@ -956,6 +1083,10 @@ void MainWindow::updateDetailPanel()
         return;
     }
     
+    if (ui->emptyStateLabel) {
+        ui->emptyStateLabel->setVisible(false);
+    }
+    
     ui->titleEdit->setText(m_currentItem->getTitle());
     ui->detailsEdit->setPlainText(m_currentItem->getDetails());
     ui->createdTimeLabel->setText(m_currentItem->getCreatedTime().toString("yyyy-MM-dd hh:mm:ss"));
@@ -972,6 +1103,44 @@ void MainWindow::updateDetailPanel()
     
     ui->completedCheckBox->setChecked(m_currentItem->isCompleted());
     
+    if (ui->plannedDateEdit) {
+        if (m_currentItem->getPlannedDate().isValid()) {
+            ui->plannedDateEdit->setDate(m_currentItem->getPlannedDate());
+        } else {
+            ui->plannedDateEdit->setDate(QDate::currentDate());
+        }
+        ui->plannedDateEdit->setEnabled(true);
+    }
+    
+    if (ui->dueDateEdit) {
+        if (m_currentItem->getDueDate().isValid()) {
+            ui->dueDateEdit->setDate(m_currentItem->getDueDate());
+        } else {
+            ui->dueDateEdit->setDate(QDate::currentDate());
+        }
+        ui->dueDateEdit->setEnabled(true);
+    }
+    
+    if (ui->priorityComboBox) {
+        int priority = qBound(0, m_currentItem->getPriority(), 2);
+        ui->priorityComboBox->setCurrentIndex(priority);
+        ui->priorityComboBox->setEnabled(true);
+    }
+    
+    if (ui->tagColorComboBox) {
+        QString tagColor = m_currentItem->getTagColor();
+        int colorIndex = 0;
+        if (tagColor == "#10b981") colorIndex = 1;
+        else if (tagColor == "#ef4444") colorIndex = 2;
+        else if (tagColor == "#f59e0b") colorIndex = 3;
+        else if (tagColor == "#8b5cf6") colorIndex = 4;
+        else if (tagColor == "#06b6d4") colorIndex = 5;
+        ui->tagColorComboBox->setCurrentIndex(colorIndex);
+        ui->tagColorComboBox->setEnabled(true);
+    }
+    
+    updateTodoTags();
+    
     ui->titleEdit->setEnabled(true);
     ui->detailsEdit->setEnabled(true);
     ui->completedCheckBox->setEnabled(true);
@@ -987,6 +1156,10 @@ void MainWindow::clearDetailPanel()
         return;
     }
     
+    if (ui->emptyStateLabel) {
+        ui->emptyStateLabel->setVisible(true);
+    }
+    
     ui->titleEdit->clear();
     ui->detailsEdit->clear();
     ui->createdTimeLabel->setText("-");
@@ -995,11 +1168,52 @@ void MainWindow::clearDetailPanel()
     ui->completedTimeLabel->setVisible(false);
     ui->completedCheckBox->setChecked(false);
     
+    if (ui->plannedDateEdit) {
+        ui->plannedDateEdit->setDate(QDate::currentDate());
+        ui->plannedDateEdit->setEnabled(false);
+    }
+    if (ui->dueDateEdit) {
+        ui->dueDateEdit->setDate(QDate::currentDate());
+        ui->dueDateEdit->setEnabled(false);
+    }
+    if (ui->priorityComboBox) {
+        ui->priorityComboBox->setCurrentIndex(0);
+        ui->priorityComboBox->setEnabled(false);
+    }
+    if (ui->tagColorComboBox) {
+        ui->tagColorComboBox->setCurrentIndex(0);
+        ui->tagColorComboBox->setEnabled(false);
+    }
+    if (ui->tagsDisplayLabel) {
+        ui->tagsDisplayLabel->setText("无标签");
+    }
+    if (ui->addTagBtn) {
+        ui->addTagBtn->setEnabled(false);
+    }
+    
     ui->titleEdit->setEnabled(false);
     ui->detailsEdit->setEnabled(false);
     ui->completedCheckBox->setEnabled(false);
     ui->saveBtn->setEnabled(false);
     ui->deleteBtn->setEnabled(false);
+}
+
+void MainWindow::updateTodoTags()
+{
+    if (!m_currentItem || !ui->tagsDisplayLabel || !ui->addTagBtn) {
+        return;
+    }
+    
+    QStringList tags = m_currentItem->getTags();
+    if (tags.isEmpty()) {
+        ui->tagsDisplayLabel->setText("无标签");
+        ui->tagsDisplayLabel->setStyleSheet("color: #94a3b8; font-size: 12px;");
+    } else {
+        QString tagsText = tags.join(", ");
+        ui->tagsDisplayLabel->setText(tagsText);
+        ui->tagsDisplayLabel->setStyleSheet("color: #3b82f6; font-size: 12px;");
+    }
+    ui->addTagBtn->setEnabled(true);
 }
 
 void MainWindow::setupDesktopWidget()
