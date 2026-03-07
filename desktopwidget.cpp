@@ -11,6 +11,8 @@
 DesktopWidget::DesktopWidget(QWidget *parent)
     : QWidget(parent)
     , m_dragging(false)
+    , m_resizing(false)
+    , m_resizeEdge(0)
 {
     m_folders.clear();
     
@@ -23,19 +25,25 @@ DesktopWidget::DesktopWidget(QWidget *parent)
     
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
     setAttribute(Qt::WA_TranslucentBackground);
-    setFixedSize(300, 420);
+    setMinimumSize(250, 300);
     
+    loadWindowSize();
     loadWindowPosition();
     
     m_refreshTimer->start();
     
     applyStyles();
     loadPendingItems();
+    
+    setMouseTracking(true);
+    m_todoListWidget->setMouseTracking(true);
+    m_todoListWidget->installEventFilter(this);
 }
 
 DesktopWidget::~DesktopWidget()
 {
     saveWindowPosition();
+    saveWindowSize();
 }
 
 void DesktopWidget::setupUI()
@@ -93,7 +101,7 @@ void DesktopWidget::applyStyles()
 {
     QString listStyle = 
         "QListWidget { border: none; background-color: transparent; }"
-        "QListWidget::item { padding: 10px 12px; border-radius: 6px; margin: 2px 0; }"
+        "QListWidget::item { padding: 10px 12px; border-radius: 6px; margin: 2px 0; border-bottom: 1px solid #f1f5f9; }"
         "QListWidget::item:hover { background-color: rgba(99, 102, 241, 0.08); }"
         "QListWidget::item:selected { background-color: rgba(99, 102, 241, 0.15); }";
     
@@ -192,18 +200,119 @@ void DesktopWidget::paintEvent(QPaintEvent *event)
 void DesktopWidget::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
-        m_dragPosition = event->globalPosition().toPoint() - frameGeometry().topLeft();
-        m_dragging = true;
-        event->accept();
+        QPoint pos = event->pos();
+        
+        if (isOnResizeArea(pos)) {
+            m_resizing = true;
+            m_resizeStartPos = event->globalPosition().toPoint();
+            m_resizeStartSize = size();
+            m_resizeStartWindowPos = this->pos();
+            event->accept();
+        } else {
+            m_dragPosition = event->globalPosition().toPoint() - frameGeometry().topLeft();
+            m_dragging = true;
+            event->accept();
+        }
     }
 }
 
 void DesktopWidget::mouseMoveEvent(QMouseEvent *event)
 {
-    if (event->buttons() & Qt::LeftButton && m_dragging) {
+    QPoint pos = event->pos();
+    
+    if (m_resizing) {
+        QPoint delta = event->globalPosition().toPoint() - m_resizeStartPos;
+        
+        int newWidth = m_resizeStartSize.width();
+        int newHeight = m_resizeStartSize.height();
+        int newX = m_resizeStartWindowPos.x();
+        int newY = m_resizeStartWindowPos.y();
+        
+        if (m_resizeEdge & 0x01) {
+            newWidth = qMax(minimumWidth(), m_resizeStartSize.width() + delta.x());
+        }
+        if (m_resizeEdge & 0x02) {
+            newWidth = qMax(minimumWidth(), m_resizeStartSize.width() - delta.x());
+            newX = m_resizeStartWindowPos.x() + (m_resizeStartSize.width() - newWidth);
+        }
+        if (m_resizeEdge & 0x04) {
+            newHeight = qMax(minimumHeight(), m_resizeStartSize.height() + delta.y());
+        }
+        if (m_resizeEdge & 0x08) {
+            newHeight = qMax(minimumHeight(), m_resizeStartSize.height() - delta.y());
+            newY = m_resizeStartWindowPos.y() + (m_resizeStartSize.height() - newHeight);
+        }
+        
+        resize(newWidth, newHeight);
+        move(newX, newY);
+        event->accept();
+    } else if (event->buttons() & Qt::LeftButton && m_dragging) {
         move(event->globalPosition().toPoint() - m_dragPosition);
         event->accept();
+    } else {
+        updateCursor(pos);
     }
+}
+
+void DesktopWidget::mouseReleaseEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton) {
+        m_dragging = false;
+        m_resizing = false;
+        m_resizeEdge = 0;
+        setCursor(Qt::ArrowCursor);
+        event->accept();
+    }
+}
+
+bool DesktopWidget::eventFilter(QObject *obj, QEvent *event)
+{
+    if (obj == m_todoListWidget && event->type() == QEvent::MouseMove) {
+        QMouseEvent *mouseEvent = static_cast<QMouseEvent*>(event);
+        QPoint globalPos = mouseEvent->globalPosition().toPoint();
+        QPoint localPos = mapFromGlobal(globalPos);
+        updateCursor(localPos);
+    }
+    return QWidget::eventFilter(obj, event);
+}
+
+void DesktopWidget::updateCursor(const QPoint &pos)
+{
+    if (m_dragging || m_resizing) return;
+    
+    int edge = 0;
+    int margin = 8;
+    
+    if (pos.x() >= width() - margin) edge |= 0x01;
+    if (pos.x() <= margin) edge |= 0x02;
+    if (pos.y() >= height() - margin) edge |= 0x04;
+    if (pos.y() <= margin) edge |= 0x08;
+    
+    Qt::CursorShape cursor = Qt::ArrowCursor;
+    if (edge == 0x01 || edge == 0x02) cursor = Qt::SizeHorCursor;
+    else if (edge == 0x04 || edge == 0x08) cursor = Qt::SizeVerCursor;
+    else if (edge == 0x05 || edge == 0x0A) cursor = Qt::SizeFDiagCursor;
+    else if (edge == 0x06 || edge == 0x09) cursor = Qt::SizeBDiagCursor;
+    
+    setCursor(cursor);
+}
+
+bool DesktopWidget::isOnResizeArea(const QPoint &pos)
+{
+    int margin = 8;
+    m_resizeEdge = 0;
+    
+    if (pos.x() >= width() - margin) m_resizeEdge |= 0x01;
+    if (pos.x() <= margin) m_resizeEdge |= 0x02;
+    if (pos.y() >= height() - margin) m_resizeEdge |= 0x04;
+    if (pos.y() <= margin) m_resizeEdge |= 0x08;
+    
+    return m_resizeEdge != 0;
+}
+
+QRect DesktopWidget::getResizeRect()
+{
+    return QRect(width() - 16, height() - 16, 16, 16);
 }
 
 void DesktopWidget::contextMenuEvent(QContextMenuEvent *event)
@@ -277,4 +386,29 @@ void DesktopWidget::loadWindowPosition()
     }
     
     move(savedPos);
+}
+
+void DesktopWidget::saveWindowSize()
+{
+    QSettings settings;
+    settings.setValue("DesktopWidget/size", size());
+}
+
+void DesktopWidget::loadWindowSize()
+{
+    QSettings settings;
+    QSize savedSize = settings.value("DesktopWidget/size", QSize(300, 420)).toSize();
+    
+    savedSize = savedSize.expandedTo(minimumSize());
+    
+    QScreen *screen = QApplication::primaryScreen();
+    QRect screenGeometry = screen->availableGeometry();
+    if (savedSize.width() > screenGeometry.width()) {
+        savedSize.setWidth(screenGeometry.width() - 50);
+    }
+    if (savedSize.height() > screenGeometry.height()) {
+        savedSize.setHeight(screenGeometry.height() - 50);
+    }
+    
+    resize(savedSize);
 }

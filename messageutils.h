@@ -64,7 +64,7 @@ public:
     {
         QDialog dialog(parent);
         dialog.setWindowTitle(title);
-        dialog.setMinimumWidth(320);
+        dialog.setMinimumWidth(300);
         dialog.setStyleSheet(R"(
             QDialog {
                 background-color: #ffffff;

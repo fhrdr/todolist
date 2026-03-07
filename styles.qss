@@ -445,21 +445,27 @@ QComboBox QAbstractItemView {
     selection-background-color: #dbeafe;
     selection-color: #1e40af;
     padding: 4px;
+    outline: none;
 }
 
 QComboBox QAbstractItemView::item {
     padding: 8px 12px;
     border-radius: 4px;
     color: #334155;
+    border: none;
+    outline: none;
 }
 
 QComboBox QAbstractItemView::item:hover {
     background-color: #f1f5f9;
+    border: none;
 }
 
 QComboBox QAbstractItemView::item:selected {
     background-color: #dbeafe;
     color: #1e40af;
+    border: none;
+    outline: none;
 }
 
 QSpinBox {

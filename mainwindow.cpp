@@ -20,7 +20,7 @@ namespace {
     {
         QDialog dialog(parent);
         dialog.setWindowTitle(title);
-        dialog.setMinimumWidth(350);
+        dialog.setMinimumWidth(330);
         dialog.setStyleSheet(R"(
             QDialog {
                 background-color: #ffffff;
@@ -92,7 +92,7 @@ namespace {
     {
         QDialog dialog(parent);
         dialog.setWindowTitle(title);
-        dialog.setMinimumWidth(350);
+        dialog.setMinimumWidth(330);
         dialog.setStyleSheet(R"(
             QDialog {
                 background-color: #ffffff;
