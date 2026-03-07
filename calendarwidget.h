@@ -176,7 +176,6 @@ private:
     QVBoxLayout *m_todoListLayout;
     QLineEdit *m_addLineEdit;
     QPushButton *m_addButton;
-    QPushButton *m_addButton2;
     QPushButton *m_deleteButton;
     QPushButton *m_toggleButton;
     QWidget *m_addPanel;

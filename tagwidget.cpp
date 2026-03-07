@@ -13,21 +13,16 @@ namespace {
     QColor getRandomTagColor()
     {
         static QList<QColor> colors = {
-            QColor(219, 234, 254),
-            QColor(209, 250, 229),
-            QColor(254, 215, 170),
-            QColor(254, 202, 202),
-            QColor(233, 213, 255),
-            QColor(207, 250, 254),
-            QColor(254, 240, 138),
-            QColor(191, 219, 254),
+            QColor(59, 130, 246),
+            QColor(16, 185, 129),
+            QColor(249, 115, 22),
+            QColor(239, 68, 68),
+            QColor(139, 92, 246),
+            QColor(6, 182, 212),
+            QColor(234, 179, 8),
+            QColor(99, 102, 241),
         };
         return colors[QRandomGenerator::global()->bounded(colors.size())];
-    }
-    
-    QColor getDarkerColor(const QColor &color)
-    {
-        return color.darker(120);
     }
 }
 
@@ -77,7 +72,7 @@ void TagCloudItem::paintEvent(QPaintEvent *event)
     font.setPixelSize(baseSize + sizeIncrement);
     font.setWeight(m_count > 3 ? QFont::DemiBold : QFont::Normal);
     painter.setFont(font);
-    painter.setPen(getDarkerColor(m_bgColor));
+    painter.setPen(QColor(255, 255, 255));
     
     painter.drawText(rect(), Qt::AlignCenter, m_tag);
 }
@@ -120,17 +115,28 @@ void TagListItem::paintEvent(QPaintEvent *event)
     tagFont.setPixelSize(13);
     painter.setFont(tagFont);
     painter.setPen(QColor(30, 41, 59));
-    painter.drawText(QRect(28, 0, width() - 80, height()), Qt::AlignLeft | Qt::AlignVCenter, m_tag);
+    painter.drawText(QRect(28, 0, width() - 100, height()), Qt::AlignLeft | Qt::AlignVCenter, m_tag);
     
     QFont countFont;
     countFont.setPixelSize(12);
     painter.setFont(countFont);
     painter.setPen(QColor(100, 116, 139));
     QString countText = QString("(%1)").arg(m_count);
-    painter.drawText(QRect(width() - 60, 0, 40, height()), Qt::AlignRight | Qt::AlignVCenter, countText);
+    painter.drawText(QRect(width() - 90, 0, 40, height()), Qt::AlignRight | Qt::AlignVCenter, countText);
     
-    m_deleteRect = QRect(width() - 28, (height() - 16) / 2, 16, 16);
-    painter.setPen(QColor(148, 163, 184));
+    m_deleteRect = QRect(width() - 40, (height() - 20) / 2, 20, 20);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(255, 255, 255));
+    painter.drawRoundedRect(m_deleteRect, 4, 4);
+    painter.setPen(QPen(QColor(239, 68, 68), 1.5));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawRoundedRect(m_deleteRect, 4, 4);
+    
+    painter.setPen(QColor(239, 68, 68));
+    QFont delFont;
+    delFont.setPixelSize(12);
+    delFont.setBold(true);
+    painter.setFont(delFont);
     painter.drawText(m_deleteRect, Qt::AlignCenter, "×");
 }
 
@@ -175,17 +181,25 @@ void TodoItemWidget::paintEvent(QPaintEvent *event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     
+    QRect contentRect = rect();
+    
     if (m_completed) {
-        painter.fillRect(rect(), QColor(252, 252, 253));
+        if (!m_tagColor.isEmpty()) {
+            QColor baseColor(m_tagColor);
+            QColor lightColor = QColor(baseColor.red(), baseColor.green(), baseColor.blue(), 60);
+            painter.fillRect(contentRect, lightColor);
+        } else {
+            painter.fillRect(contentRect, QColor(248, 250, 252));
+        }
     } else if (!m_tagColor.isEmpty()) {
         QColor baseColor(m_tagColor);
         QColor lightColor = baseColor.lighter(170);
-        QLinearGradient gradient(rect().left(), rect().top(), rect().right(), rect().bottom());
+        QLinearGradient gradient(contentRect.left(), contentRect.top(), contentRect.right(), contentRect.bottom());
         gradient.setColorAt(0, lightColor);
         gradient.setColorAt(1, QColor(255, 255, 255));
-        painter.fillRect(rect(), gradient);
+        painter.fillRect(contentRect, gradient);
     } else {
-        painter.fillRect(rect(), QColor(255, 255, 255));
+        painter.fillRect(contentRect, QColor(255, 255, 255));
     }
     
     QColor checkColor = m_completed ? QColor(180, 190, 200) : QColor(203, 213, 225);
@@ -244,6 +258,9 @@ void TodoItemWidget::paintEvent(QPaintEvent *event)
     
     if (!m_tagColor.isEmpty()) {
         QColor tagColor(m_tagColor);
+        if (m_completed) {
+            tagColor = QColor(tagColor.red(), tagColor.green(), tagColor.blue(), 120);
+        }
         painter.setPen(Qt::NoPen);
         painter.setBrush(tagColor);
         painter.drawRoundedRect(width() - 40, (height() - 6) / 2, 24, 6, 3, 3);
@@ -340,10 +357,10 @@ void TagWidget::setupUI()
     m_addLayout->addWidget(m_addLineEdit, 1);
     
     QString btnStyle = 
-        "QPushButton { background-color: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; "
-        "padding: 8px 16px; color: #475569; font-size: 13px; font-weight: 500; }"
-        "QPushButton:hover { background-color: #e2e8f0; border-color: #cbd5e1; }"
-        "QPushButton:pressed { background-color: #cbd5e1; }";
+        "QPushButton { background-color: #ffffff; border: 2px solid #3b82f6; border-radius: 8px; "
+        "padding: 8px 16px; color: #3b82f6; font-size: 13px; font-weight: 500; }"
+        "QPushButton:hover { background-color: rgba(59, 130, 246, 0.1); }"
+        "QPushButton:pressed { background-color: rgba(59, 130, 246, 0.2); }";
     
     m_addButton = new QPushButton("添加");
     m_addButton->setStyleSheet(btnStyle);
@@ -495,7 +512,15 @@ void TagWidget::refreshTodoList()
     }
     
     if (m_tagToTodos.contains(m_selectedTag)) {
-        for (const TodoItem &item : m_tagToTodos[m_selectedTag]) {
+        QList<TodoItem> sortedTodos = m_tagToTodos[m_selectedTag];
+        std::sort(sortedTodos.begin(), sortedTodos.end(), [](const TodoItem &a, const TodoItem &b) {
+            if (a.isCompleted() != b.isCompleted()) {
+                return a.isCompleted() < b.isCompleted();
+            }
+            return a.getCreatedTime() > b.getCreatedTime();
+        });
+        
+        for (const TodoItem &item : sortedTodos) {
             QString folderName = m_todoToFolder.value(item.getId(), "");
             TodoItemWidget *widget = new TodoItemWidget(item, folderName);
             connect(widget, &TodoItemWidget::clicked, this, &TagWidget::onTodoItemClicked);

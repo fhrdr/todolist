@@ -875,11 +875,8 @@ void MainWindow::onDeleteClicked()
         return;
     }
     
-    QMessageBox::StandardButton reply = QMessageBox::question(this, "确认删除", 
-        QString("确定要删除待办事项 \"%1\" 吗？").arg(m_currentItem->getTitle()),
-        QMessageBox::Yes | QMessageBox::No);
-    
-    if (reply == QMessageBox::Yes) {
+    if (MessageUtils::showConfirm(this, "确认删除", 
+        QString("确定要删除待办事项 \"%1\" 吗？").arg(m_currentItem->getTitle()))) {
         m_currentFolder->removeItem(m_currentItem->getId());
         m_currentItem = nullptr;
         

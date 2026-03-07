@@ -399,22 +399,53 @@ void TodoListItem::paintEvent(QPaintEvent *event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     
-    QColor bgColor = m_selected ? QColor(239, 246, 255) : QColor(255, 255, 255);
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(bgColor);
-    painter.drawRoundedRect(rect().adjusted(4, 2, -4, -2), 6, 6);
+    QRect contentRect = rect().adjusted(4, 2, -4, -2);
+    
+    if (m_completed) {
+        if (!m_tagColor.isEmpty()) {
+            QColor baseColor(m_tagColor);
+            QColor lightColor = QColor(baseColor.red(), baseColor.green(), baseColor.blue(), 60);
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(lightColor);
+            painter.drawRoundedRect(contentRect, 6, 6);
+        } else {
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(QColor(248, 250, 252));
+            painter.drawRoundedRect(contentRect, 6, 6);
+        }
+    } else {
+        if (!m_tagColor.isEmpty()) {
+            QColor baseColor(m_tagColor);
+            QColor lightColor = baseColor.lighter(160);
+            QLinearGradient gradient(contentRect.left(), contentRect.top(), 
+                                     contentRect.right(), contentRect.bottom());
+            gradient.setColorAt(0, lightColor);
+            gradient.setColorAt(1, QColor(255, 255, 255));
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(gradient);
+            painter.drawRoundedRect(contentRect, 6, 6);
+        } else {
+            QColor bgColor = m_selected ? QColor(239, 246, 255) : QColor(255, 255, 255);
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(bgColor);
+            painter.drawRoundedRect(contentRect, 6, 6);
+        }
+    }
     
     if (m_selected) {
         painter.setPen(QPen(QColor(148, 163, 184), 1));
         painter.setBrush(Qt::NoBrush);
-        painter.drawRoundedRect(rect().adjusted(4, 2, -4, -2), 6, 6);
+        painter.drawRoundedRect(contentRect, 6, 6);
     }
     
     QColor tagColor = QColor(148, 163, 184);
     if (!m_tagColor.isEmpty()) {
         tagColor = QColor(m_tagColor);
+        if (m_completed) {
+            tagColor = QColor(tagColor.red(), tagColor.green(), tagColor.blue(), 120);
+        }
     }
-    if (m_completed) {
+    if (m_completed && m_tagColor.isEmpty()) {
         tagColor = QColor(180, 190, 200);
     }
     painter.setBrush(tagColor);
@@ -535,29 +566,24 @@ void CalendarWidget::setupUI()
     buttonLayout->setContentsMargins(16, 0, 16, 16);
     buttonLayout->setSpacing(8);
     
-    QString btnStyle2 = 
-        "QPushButton { background-color: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; "
-        "padding: 8px 16px; color: #475569; font-size: 13px; font-weight: 500; }"
-        "QPushButton:hover { background-color: #e2e8f0; border-color: #cbd5e1; }"
-        "QPushButton:pressed { background-color: #cbd5e1; }"
-        "QPushButton:disabled { background-color: #f8fafc; color: #94a3b8; }";
-    
-    m_addButton2 = new QPushButton("添加");
-    m_addButton2->setStyleSheet(btnStyle2);
-    buttonLayout->addWidget(m_addButton2);
-    
     m_toggleButton = new QPushButton("完成");
-    m_toggleButton->setStyleSheet(btnStyle2);
+    m_toggleButton->setStyleSheet(
+        "QPushButton { background-color: #ffffff; border: 2px solid #22c55e; border-radius: 8px; "
+        "padding: 8px 16px; color: #22c55e; font-size: 13px; font-weight: 500; }"
+        "QPushButton:hover { background-color: rgba(34, 197, 94, 0.1); }"
+        "QPushButton:pressed { background-color: rgba(34, 197, 94, 0.2); }"
+        "QPushButton:disabled { background-color: #ffffff; color: #94a3b8; border-color: #e2e8f0; }"
+    );
     m_toggleButton->setEnabled(false);
     buttonLayout->addWidget(m_toggleButton);
     
     m_deleteButton = new QPushButton("删除");
     m_deleteButton->setStyleSheet(
-        "QPushButton { background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; "
-        "padding: 8px 16px; color: #dc2626; font-size: 13px; font-weight: 500; }"
-        "QPushButton:hover { background-color: #fee2e2; border-color: #fca5a5; }"
-        "QPushButton:pressed { background-color: #fecaca; }"
-        "QPushButton:disabled { background-color: #f8fafc; color: #94a3b8; border-color: #e2e8f0; }"
+        "QPushButton { background-color: #ffffff; border: 2px solid #3b82f6; border-radius: 8px; "
+        "padding: 8px 16px; color: #3b82f6; font-size: 13px; font-weight: 500; }"
+        "QPushButton:hover { background-color: rgba(59, 130, 246, 0.1); }"
+        "QPushButton:pressed { background-color: rgba(59, 130, 246, 0.2); }"
+        "QPushButton:disabled { background-color: #ffffff; color: #94a3b8; border-color: #e2e8f0; }"
     );
     m_deleteButton->setEnabled(false);
     buttonLayout->addWidget(m_deleteButton);
@@ -577,7 +603,6 @@ void CalendarWidget::setupConnections()
         updateDateLabel();
     });
     connect(m_addButton, &QPushButton::clicked, this, &CalendarWidget::onAddTodo);
-    connect(m_addButton2, &QPushButton::clicked, this, &CalendarWidget::onAddTodo);
     connect(m_deleteButton, &QPushButton::clicked, this, &CalendarWidget::onDeleteTodo);
     connect(m_toggleButton, &QPushButton::clicked, this, &CalendarWidget::onToggleTodo);
 }
@@ -628,6 +653,13 @@ void CalendarWidget::refreshTodoList()
     if (m_dateToTodos.contains(m_currentDate)) {
         todos = m_dateToTodos[m_currentDate];
     }
+    
+    std::sort(todos.begin(), todos.end(), [](const TodoItem &a, const TodoItem &b) {
+        if (a.isCompleted() != b.isCompleted()) {
+            return a.isCompleted() < b.isCompleted();
+        }
+        return a.getCreatedTime() > b.getCreatedTime();
+    });
     
     int completedCount = 0;
     for (const TodoItem &todo : todos) {

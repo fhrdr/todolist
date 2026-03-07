@@ -64,6 +64,8 @@ public:
         msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
         msgBox.setDefaultButton(QMessageBox::No);
         msgBox.setStyleSheet(getStyleSheet());
+        msgBox.button(QMessageBox::Yes)->setText("确定");
+        msgBox.button(QMessageBox::No)->setText("取消");
         return msgBox.exec() == QMessageBox::Yes;
     }
     
@@ -79,7 +81,7 @@ private:
             QMessageBox QLabel {
                 color: #1f2937;
                 font-size: 13px;
-                min-width: 280px;
+                min-width: 200px;
             }
             QPushButton {
                 background-color: #4f46e5;
@@ -96,12 +98,6 @@ private:
             }
             QPushButton:pressed {
                 background-color: #3730a3;
-            }
-            QPushButton[text="No"], QPushButton[text="否"] {
-                background-color: #6b7280;
-            }
-            QPushButton[text="No"]:hover, QPushButton[text="否"]:hover {
-                background-color: #4b5563;
             }
         )";
     }
