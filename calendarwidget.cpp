@@ -190,18 +190,26 @@ void CalendarGrid::setupUI()
     m_headerWidget = new QWidget();
     m_headerLayout = new QHBoxLayout(m_headerWidget);
     m_headerLayout->setContentsMargins(0, 0, 0, 0);
-    m_headerLayout->setSpacing(8);
+    m_headerLayout->setSpacing(4);
+    
+    QString btnStyle = 
+        "QPushButton { background-color: #dbeafe; border: none; border-radius: 6px; "
+        "color: #1e40af; font-size: 12px; font-weight: bold; }"
+        "QPushButton:hover { background-color: #bfdbfe; }"
+        "QPushButton:pressed { background-color: #93c5fd; }";
+    
+    m_prevYearBtn = new QPushButton("<<");
+    m_prevYearBtn->setFixedSize(36, 32);
+    m_prevYearBtn->setCursor(Qt::PointingHandCursor);
+    m_prevYearBtn->setToolTip("上一年");
+    m_prevYearBtn->setStyleSheet(btnStyle);
+    m_headerLayout->addWidget(m_prevYearBtn);
     
     m_prevBtn = new QPushButton("<");
-    m_prevBtn->setFixedSize(32, 32);
+    m_prevBtn->setFixedSize(36, 32);
     m_prevBtn->setCursor(Qt::PointingHandCursor);
     m_prevBtn->setToolTip("上一月");
-    m_prevBtn->setStyleSheet(
-        "QPushButton { background-color: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 6px; "
-        "color: #475569; font-size: 14px; font-weight: bold; }"
-        "QPushButton:hover { background-color: #e2e8f0; border-color: #cbd5e1; }"
-        "QPushButton:pressed { background-color: #cbd5e1; }"
-    );
+    m_prevBtn->setStyleSheet(btnStyle);
     m_headerLayout->addWidget(m_prevBtn);
     
     m_monthLabel = new QLabel();
@@ -210,16 +218,18 @@ void CalendarGrid::setupUI()
     m_headerLayout->addWidget(m_monthLabel, 1);
     
     m_nextBtn = new QPushButton(">");
-    m_nextBtn->setFixedSize(32, 32);
+    m_nextBtn->setFixedSize(36, 32);
     m_nextBtn->setCursor(Qt::PointingHandCursor);
     m_nextBtn->setToolTip("下一月");
-    m_nextBtn->setStyleSheet(
-        "QPushButton { background-color: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 6px; "
-        "color: #475569; font-size: 14px; font-weight: bold; }"
-        "QPushButton:hover { background-color: #e2e8f0; border-color: #cbd5e1; }"
-        "QPushButton:pressed { background-color: #cbd5e1; }"
-    );
+    m_nextBtn->setStyleSheet(btnStyle);
     m_headerLayout->addWidget(m_nextBtn);
+    
+    m_nextYearBtn = new QPushButton(">>");
+    m_nextYearBtn->setFixedSize(36, 32);
+    m_nextYearBtn->setCursor(Qt::PointingHandCursor);
+    m_nextYearBtn->setToolTip("下一年");
+    m_nextYearBtn->setStyleSheet(btnStyle);
+    m_headerLayout->addWidget(m_nextYearBtn);
     
     m_mainLayout->addWidget(m_headerWidget);
     
@@ -255,6 +265,8 @@ void CalendarGrid::setupUI()
     
     connect(m_prevBtn, &QPushButton::clicked, this, &CalendarGrid::onPrevMonth);
     connect(m_nextBtn, &QPushButton::clicked, this, &CalendarGrid::onNextMonth);
+    connect(m_prevYearBtn, &QPushButton::clicked, this, &CalendarGrid::onPrevYear);
+    connect(m_nextYearBtn, &QPushButton::clicked, this, &CalendarGrid::onNextYear);
     
     updateCells();
 }
@@ -331,6 +343,20 @@ void CalendarGrid::onNextMonth()
         m_month = 1;
         m_year++;
     }
+    updateCells();
+    emit monthChanged(m_year, m_month);
+}
+
+void CalendarGrid::onPrevYear()
+{
+    m_year--;
+    updateCells();
+    emit monthChanged(m_year, m_month);
+}
+
+void CalendarGrid::onNextYear()
+{
+    m_year++;
     updateCells();
     emit monthChanged(m_year, m_month);
 }
@@ -444,17 +470,17 @@ void CalendarWidget::setupUI()
     m_rightPanel->setMaximumWidth(320);
     
     QWidget *headerWidget = new QWidget();
-    headerWidget->setStyleSheet("background-color: transparent; border-bottom: 1px solid #f1f5f9;");
+    headerWidget->setStyleSheet("background-color: transparent;");
     QVBoxLayout *headerLayout = new QVBoxLayout(headerWidget);
     headerLayout->setContentsMargins(20, 16, 20, 12);
     headerLayout->setSpacing(6);
     
     m_dateLabel = new QLabel();
-    m_dateLabel->setStyleSheet("font-size: 14px; font-weight: 600; color: #1e293b;");
+    m_dateLabel->setStyleSheet("font-size: 14px; font-weight: 600; color: #1e293b; border: none;");
     headerLayout->addWidget(m_dateLabel);
     
     m_countLabel = new QLabel();
-    m_countLabel->setStyleSheet("font-size: 12px; color: #64748b;");
+    m_countLabel->setStyleSheet("font-size: 12px; color: #64748b; border: none;");
     headerLayout->addWidget(m_countLabel);
     
     m_rightLayout->addWidget(headerWidget);
@@ -491,13 +517,14 @@ void CalendarWidget::setupUI()
     );
     m_addLayout->addWidget(m_addLineEdit, 1);
     
-    m_addButton = new QPushButton("添加");
-    m_addButton->setStyleSheet(
+    QString btnStyle = 
         "QPushButton { background-color: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; "
         "padding: 8px 16px; color: #475569; font-size: 13px; font-weight: 500; }"
         "QPushButton:hover { background-color: #e2e8f0; border-color: #cbd5e1; }"
-        "QPushButton:pressed { background-color: #cbd5e1; }"
-    );
+        "QPushButton:pressed { background-color: #cbd5e1; }";
+    
+    m_addButton = new QPushButton("添加");
+    m_addButton->setStyleSheet(btnStyle);
     m_addLayout->addWidget(m_addButton);
     
     m_rightLayout->addWidget(m_addPanel);
@@ -508,23 +535,19 @@ void CalendarWidget::setupUI()
     buttonLayout->setContentsMargins(16, 0, 16, 16);
     buttonLayout->setSpacing(8);
     
-    m_addButton2 = new QPushButton("添加");
-    m_addButton2->setStyleSheet(
+    QString btnStyle2 = 
         "QPushButton { background-color: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; "
         "padding: 8px 16px; color: #475569; font-size: 13px; font-weight: 500; }"
         "QPushButton:hover { background-color: #e2e8f0; border-color: #cbd5e1; }"
         "QPushButton:pressed { background-color: #cbd5e1; }"
-    );
+        "QPushButton:disabled { background-color: #f8fafc; color: #94a3b8; }";
+    
+    m_addButton2 = new QPushButton("添加");
+    m_addButton2->setStyleSheet(btnStyle2);
     buttonLayout->addWidget(m_addButton2);
     
     m_toggleButton = new QPushButton("完成");
-    m_toggleButton->setStyleSheet(
-        "QPushButton { background-color: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; "
-        "padding: 8px 16px; color: #475569; font-size: 13px; font-weight: 500; }"
-        "QPushButton:hover { background-color: #e2e8f0; border-color: #cbd5e1; }"
-        "QPushButton:pressed { background-color: #cbd5e1; }"
-        "QPushButton:disabled { background-color: #f8fafc; color: #94a3b8; }"
-    );
+    m_toggleButton->setStyleSheet(btnStyle2);
     m_toggleButton->setEnabled(false);
     buttonLayout->addWidget(m_toggleButton);
     
@@ -577,9 +600,16 @@ void CalendarWidget::refreshCalendarData()
     
     for (const TodoFolder &folder : m_folders) {
         for (const TodoItem &item : folder.getItems()) {
-            QDate date = item.getDueDate();
-            if (date.isValid()) {
-                m_dateToTodos[date].append(item);
+            QDate dueDate = item.getDueDate();
+            if (dueDate.isValid()) {
+                m_dateToTodos[dueDate].append(item);
+            }
+            
+            QDate createdDate = item.getCreatedTime().date();
+            if (createdDate.isValid() && (!dueDate.isValid() || dueDate != createdDate)) {
+                if (!m_dateToTodos[createdDate].contains(item)) {
+                    m_dateToTodos[createdDate].append(item);
+                }
             }
         }
     }

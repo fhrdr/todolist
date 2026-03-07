@@ -5,12 +5,39 @@
 #include <QScrollBar>
 #include <QStyle>
 #include <QRandomGenerator>
+#include <QSqlDatabase>
+#include <QSqlQuery>
+#include <QUuid>
+
+namespace {
+    QColor getRandomTagColor()
+    {
+        static QList<QColor> colors = {
+            QColor(219, 234, 254),
+            QColor(209, 250, 229),
+            QColor(254, 215, 170),
+            QColor(254, 202, 202),
+            QColor(233, 213, 255),
+            QColor(207, 250, 254),
+            QColor(254, 240, 138),
+            QColor(191, 219, 254),
+        };
+        return colors[QRandomGenerator::global()->bounded(colors.size())];
+    }
+    
+    QColor getDarkerColor(const QColor &color)
+    {
+        return color.darker(120);
+    }
+}
 
 TagCloudItem::TagCloudItem(const QString &tag, int count, QWidget *parent)
     : QWidget(parent)
     , m_tag(tag)
     , m_count(count)
 {
+    m_bgColor = getRandomTagColor();
+    
     int baseSize = 12;
     int sizeIncrement = qMin(count, 5) * 2;
     int fontSize = baseSize + sizeIncrement;
@@ -40,17 +67,9 @@ void TagCloudItem::paintEvent(QPaintEvent *event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     
-    QColor bgColor(241, 245, 249);
-    QColor borderColor(203, 213, 225);
-    QColor textColor(51, 65, 85);
-    
     painter.setPen(Qt::NoPen);
-    painter.setBrush(bgColor);
+    painter.setBrush(m_bgColor);
     painter.drawRoundedRect(rect(), 16, 16);
-    
-    painter.setPen(QPen(borderColor, 1));
-    painter.setBrush(Qt::NoBrush);
-    painter.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 16, 16);
     
     QFont font = painter.font();
     int baseSize = 12;
@@ -58,7 +77,7 @@ void TagCloudItem::paintEvent(QPaintEvent *event)
     font.setPixelSize(baseSize + sizeIncrement);
     font.setWeight(m_count > 3 ? QFont::DemiBold : QFont::Normal);
     painter.setFont(font);
-    painter.setPen(textColor);
+    painter.setPen(getDarkerColor(m_bgColor));
     
     painter.drawText(rect(), Qt::AlignCenter, m_tag);
 }
@@ -68,6 +87,7 @@ TagListItem::TagListItem(const QString &tag, int count, QWidget *parent)
     , m_tag(tag)
     , m_count(count)
 {
+    m_bgColor = getRandomTagColor();
     setMinimumHeight(40);
     setCursor(Qt::PointingHandCursor);
     m_deleteRect = QRect(0, 0, 0, 0);
@@ -92,9 +112,8 @@ void TagListItem::paintEvent(QPaintEvent *event)
     
     painter.fillRect(rect(), QColor(255, 255, 255));
     
-    QColor tagColor(148, 163, 184);
     painter.setPen(Qt::NoPen);
-    painter.setBrush(tagColor);
+    painter.setBrush(m_bgColor);
     painter.drawRoundedRect(16, 12, 4, height() - 24, 2, 2);
     
     QFont tagFont;
@@ -158,6 +177,13 @@ void TodoItemWidget::paintEvent(QPaintEvent *event)
     
     if (m_completed) {
         painter.fillRect(rect(), QColor(252, 252, 253));
+    } else if (!m_tagColor.isEmpty()) {
+        QColor baseColor(m_tagColor);
+        QColor lightColor = baseColor.lighter(170);
+        QLinearGradient gradient(rect().left(), rect().top(), rect().right(), rect().bottom());
+        gradient.setColorAt(0, lightColor);
+        gradient.setColorAt(1, QColor(255, 255, 255));
+        painter.fillRect(rect(), gradient);
     } else {
         painter.fillRect(rect(), QColor(255, 255, 255));
     }
@@ -253,7 +279,7 @@ void TagWidget::setupUI()
     m_cloudLayout->setSpacing(8);
     
     m_cloudTitle = new QLabel("标签云");
-    m_cloudTitle->setStyleSheet("font-size: 14px; font-weight: 600; color: #1e293b;");
+    m_cloudTitle->setStyleSheet("font-size: 14px; font-weight: 600; color: #1e293b; border: none;");
     m_cloudTitle->setFixedHeight(24);
     m_cloudLayout->addWidget(m_cloudTitle);
     
@@ -277,7 +303,7 @@ void TagWidget::setupUI()
     listHeaderLayout->setContentsMargins(20, 8, 20, 8);
     
     m_listTitle = new QLabel("标签列表");
-    m_listTitle->setStyleSheet("font-size: 14px; font-weight: 600; color: #1e293b;");
+    m_listTitle->setStyleSheet("font-size: 14px; font-weight: 600; color: #1e293b; border: none;");
     listHeaderLayout->addWidget(m_listTitle);
     listHeaderLayout->addStretch();
     m_listLayout->addWidget(listHeader);
@@ -313,13 +339,14 @@ void TagWidget::setupUI()
     );
     m_addLayout->addWidget(m_addLineEdit, 1);
     
-    m_addButton = new QPushButton("添加");
-    m_addButton->setStyleSheet(
+    QString btnStyle = 
         "QPushButton { background-color: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; "
         "padding: 8px 16px; color: #475569; font-size: 13px; font-weight: 500; }"
         "QPushButton:hover { background-color: #e2e8f0; border-color: #cbd5e1; }"
-        "QPushButton:pressed { background-color: #cbd5e1; }"
-    );
+        "QPushButton:pressed { background-color: #cbd5e1; }";
+    
+    m_addButton = new QPushButton("添加");
+    m_addButton->setStyleSheet(btnStyle);
     m_addLayout->addWidget(m_addButton);
     
     m_listLayout->addWidget(m_addPanel);
@@ -336,17 +363,17 @@ void TagWidget::setupUI()
     todoMainLayout->setSpacing(0);
     
     QWidget *todoHeader = new QWidget();
-    todoHeader->setStyleSheet("background-color: transparent; border-bottom: 1px solid #f1f5f9;");
+    todoHeader->setStyleSheet("background-color: transparent;");
     QVBoxLayout *todoHeaderLayout = new QVBoxLayout(todoHeader);
     todoHeaderLayout->setContentsMargins(20, 16, 20, 12);
     todoHeaderLayout->setSpacing(6);
     
     m_todoTitle = new QLabel("待办事项");
-    m_todoTitle->setStyleSheet("font-size: 14px; font-weight: 600; color: #1e293b;");
+    m_todoTitle->setStyleSheet("font-size: 14px; font-weight: 600; color: #1e293b; border: none;");
     todoHeaderLayout->addWidget(m_todoTitle);
     
     m_selectedTagLabel = new QLabel("选择一个标签查看相关待办事项");
-    m_selectedTagLabel->setStyleSheet("font-size: 12px; color: #64748b;");
+    m_selectedTagLabel->setStyleSheet("font-size: 12px; color: #64748b; border: none;");
     todoHeaderLayout->addWidget(m_selectedTagLabel);
     
     todoMainLayout->addWidget(todoHeader);
@@ -388,6 +415,16 @@ void TagWidget::collectAllTags()
     m_tagCounts.clear();
     m_tagToTodos.clear();
     m_todoToFolder.clear();
+    
+    QSqlQuery query;
+    if (query.exec("SELECT name FROM tags")) {
+        while (query.next()) {
+            QString tagName = query.value(0).toString();
+            if (!m_tagCounts.contains(tagName)) {
+                m_tagCounts[tagName] = 0;
+            }
+        }
+    }
     
     for (const TodoFolder &folder : m_folders) {
         for (const TodoItem &item : folder.getItems()) {
@@ -453,6 +490,10 @@ void TagWidget::refreshTodoList()
     int count = m_tagCounts.value(m_selectedTag, 0);
     m_selectedTagLabel->setText(QString("标签 \"%1\" 共有 %2 个待办事项").arg(m_selectedTag).arg(count));
     
+    if (count == 0) {
+        return;
+    }
+    
     if (m_tagToTodos.contains(m_selectedTag)) {
         for (const TodoItem &item : m_tagToTodos[m_selectedTag]) {
             QString folderName = m_todoToFolder.value(item.getId(), "");
@@ -480,6 +521,11 @@ void TagWidget::onTagListClicked(const QString &tag)
 
 void TagWidget::onTagDeleteRequested(const QString &tag)
 {
+    QSqlQuery query;
+    query.prepare("DELETE FROM tags WHERE name = ?");
+    query.addBindValue(tag);
+    query.exec();
+    
     emit tagDeleted(tag);
 }
 

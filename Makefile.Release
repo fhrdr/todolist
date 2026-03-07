@@ -2884,7 +2884,15 @@ release/tagwidget.o: tagwidget.cpp tagwidget.h \
 		D:/Qt/qt6/6.8.3/mingw_64/include/QtWidgets/qscrollbar.h \
 		D:/Qt/qt6/6.8.3/mingw_64/include/QtWidgets/qabstractslider.h \
 		D:/Qt/qt6/6.8.3/mingw_64/include/QtCore/QRandomGenerator \
-		D:/Qt/qt6/6.8.3/mingw_64/include/QtCore/qrandom.h
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtCore/qrandom.h \
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtSql/QSqlDatabase \
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtSql/qsqldatabase.h \
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtSql/qtsqlglobal.h \
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtSql/qtsql-config.h \
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtSql/qtsqlexports.h \
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtCore/qmetaobject.h \
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtSql/QSqlQuery \
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtSql/qsqlquery.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o release\tagwidget.o tagwidget.cpp
 
 release/qrc_resources.o: release/qrc_resources.cpp 

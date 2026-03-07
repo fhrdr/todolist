@@ -76,6 +76,8 @@ protected:
 private slots:
     void onPrevMonth();
     void onNextMonth();
+    void onPrevYear();
+    void onNextYear();
     
 private:
     void setupUI();
@@ -84,8 +86,10 @@ private:
     QVBoxLayout *m_mainLayout;
     QWidget *m_headerWidget;
     QHBoxLayout *m_headerLayout;
+    QPushButton *m_prevYearBtn;
     QPushButton *m_prevBtn;
     QPushButton *m_nextBtn;
+    QPushButton *m_nextYearBtn;
     QLabel *m_monthLabel;
     QWidget *m_weekHeader;
     QHBoxLayout *m_weekHeaderLayout;

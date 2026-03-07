@@ -182,7 +182,9 @@ static constexpr auto qt_meta_stringdata_ZN12CalendarGridE = QtMocHelpers::strin
     "year",
     "month",
     "onPrevMonth",
-    "onNextMonth"
+    "onNextMonth",
+    "onPrevYear",
+    "onNextYear"
 );
 #else  // !QT_MOC_HAS_STRINGDATA
 #error "qtmochelpers.h not found or too old."
@@ -194,7 +196,7 @@ Q_CONSTINIT static const uint qt_meta_data_ZN12CalendarGridE[] = {
       12,       // revision
        0,       // classname
        0,    0, // classinfo
-       5,   14, // methods
+       7,   14, // methods
        0,    0, // properties
        0,    0, // enums/sets
        0,    0, // constructors
@@ -202,13 +204,15 @@ Q_CONSTINIT static const uint qt_meta_data_ZN12CalendarGridE[] = {
        3,       // signalCount
 
  // signals: name, argc, parameters, tag, flags, initial metatype offsets
-       1,    1,   44,    2, 0x06,    1 /* Public */,
-       4,    1,   47,    2, 0x06,    3 /* Public */,
-       6,    2,   50,    2, 0x06,    5 /* Public */,
+       1,    1,   56,    2, 0x06,    1 /* Public */,
+       4,    1,   59,    2, 0x06,    3 /* Public */,
+       6,    2,   62,    2, 0x06,    5 /* Public */,
 
  // slots: name, argc, parameters, tag, flags, initial metatype offsets
-       9,    0,   55,    2, 0x08,    8 /* Private */,
-      10,    0,   56,    2, 0x08,    9 /* Private */,
+       9,    0,   67,    2, 0x08,    8 /* Private */,
+      10,    0,   68,    2, 0x08,    9 /* Private */,
+      11,    0,   69,    2, 0x08,   10 /* Private */,
+      12,    0,   70,    2, 0x08,   11 /* Private */,
 
  // signals: parameters
     QMetaType::Void, QMetaType::QDate,    3,
@@ -216,6 +220,8 @@ Q_CONSTINIT static const uint qt_meta_data_ZN12CalendarGridE[] = {
     QMetaType::Void, QMetaType::Int, QMetaType::Int,    7,    8,
 
  // slots: parameters
+    QMetaType::Void,
+    QMetaType::Void,
     QMetaType::Void,
     QMetaType::Void,
 
@@ -244,6 +250,10 @@ Q_CONSTINIT const QMetaObject CalendarGrid::staticMetaObject = { {
         // method 'onPrevMonth'
         QtPrivate::TypeAndForceComplete<void, std::false_type>,
         // method 'onNextMonth'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'onPrevYear'
+        QtPrivate::TypeAndForceComplete<void, std::false_type>,
+        // method 'onNextYear'
         QtPrivate::TypeAndForceComplete<void, std::false_type>
     >,
     nullptr
@@ -259,6 +269,8 @@ void CalendarGrid::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id
         case 2: _t->monthChanged((*reinterpret_cast< std::add_pointer_t<int>>(_a[1])),(*reinterpret_cast< std::add_pointer_t<int>>(_a[2]))); break;
         case 3: _t->onPrevMonth(); break;
         case 4: _t->onNextMonth(); break;
+        case 5: _t->onPrevYear(); break;
+        case 6: _t->onNextYear(); break;
         default: ;
         }
     }
@@ -307,14 +319,14 @@ int CalendarGrid::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 5)
+        if (_id < 7)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 5;
+        _id -= 7;
     }
     if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 5)
+        if (_id < 7)
             *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType();
-        _id -= 5;
+        _id -= 7;
     }
     return _id;
 }

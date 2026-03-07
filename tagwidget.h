@@ -33,6 +33,7 @@ protected:
 private:
     QString m_tag;
     int m_count;
+    QColor m_bgColor;
 };
 
 class TagListItem : public QWidget
@@ -55,6 +56,7 @@ private:
     QString m_tag;
     int m_count;
     QRect m_deleteRect;
+    QColor m_bgColor;
 };
 
 class TodoItemWidget : public QWidget

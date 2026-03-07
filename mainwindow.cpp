@@ -1065,7 +1065,9 @@ void MainWindow::updateTodoList()
         } else if (priority == 1) {
             priorityIcon = "🟡 ";
         }
-        displayText = priorityIcon + displayText + item.getTitle();
+        
+        QString createdDate = item.getCreatedTime().toString("MM-dd");
+        displayText = priorityIcon + displayText + item.getTitle() + "\t" + createdDate;
         
         QString subText;
         if (!item.getDetails().isEmpty()) {
@@ -1398,10 +1400,12 @@ void MainWindow::setupTagWidget()
         toggleTodoCompleted(todoId, completed);
     });
     connect(m_tagWidget, &TagWidget::tagCreated, [this](const QString &tag) {
-        if (m_currentItem) {
-            m_currentItem->addTag(tag);
-            saveData();
-            updateTodoTags();
+        QSqlQuery query;
+        query.prepare("INSERT OR IGNORE INTO tags (id, name, color) VALUES (?, ?, ?)");
+        query.addBindValue(QUuid::createUuid().toString(QUuid::WithoutBraces));
+        query.addBindValue(tag);
+        query.addBindValue("#3b82f6");
+        if (query.exec()) {
             updateTagWidget();
         }
     });
