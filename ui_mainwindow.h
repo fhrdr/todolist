@@ -14,7 +14,6 @@
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QCheckBox>
 #include <QtWidgets/QComboBox>
-#include <QtWidgets/QDateEdit>
 #include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QLineEdit>
@@ -70,10 +69,6 @@ public:
     QLineEdit *titleEdit;
     QLabel *detailsLabel;
     QTextEdit *detailsEdit;
-    QLabel *plannedDateLabel;
-    QDateEdit *plannedDateEdit;
-    QLabel *dueDateLabel;
-    QDateEdit *dueDateEdit;
     QLabel *priorityLabel;
     QComboBox *priorityComboBox;
     QLabel *tagColorLabel;
@@ -246,14 +241,14 @@ public:
         detailContent->setObjectName("detailContent");
         detailContent->setGeometry(QRect(0, 0, 280, 500));
         detailContentLayout = new QVBoxLayout(detailContent);
-        detailContentLayout->setSpacing(16);
+        detailContentLayout->setSpacing(8);
         detailContentLayout->setObjectName("detailContentLayout");
         detailContentLayout->setContentsMargins(0, 0, 0, 0);
         emptyStateLabel = new QLabel(detailContent);
         emptyStateLabel->setObjectName("emptyStateLabel");
         emptyStateLabel->setAlignment(Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop);
         emptyStateLabel->setWordWrap(true);
-        emptyStateLabel->setStyleSheet(QString::fromUtf8("color: #94a3b8; font-size: 13px; padding: 20px; background-color: #f8fafc; border-radius: 8px;"));
+        emptyStateLabel->setStyleSheet(QString::fromUtf8("color: #94a3b8; font-size: 13px; padding: 16px; background-color: #f8fafc; border-radius: 8px;"));
 
         detailContentLayout->addWidget(emptyStateLabel);
 
@@ -276,33 +271,9 @@ public:
 
         detailsEdit = new QTextEdit(detailContent);
         detailsEdit->setObjectName("detailsEdit");
-        detailsEdit->setMinimumSize(QSize(0, 80));
+        detailsEdit->setMinimumSize(QSize(0, 60));
 
         detailContentLayout->addWidget(detailsEdit);
-
-        plannedDateLabel = new QLabel(detailContent);
-        plannedDateLabel->setObjectName("plannedDateLabel");
-        plannedDateLabel->setStyleSheet(QString::fromUtf8("font-weight: 500; font-size: 12px; color: #64748b;"));
-
-        detailContentLayout->addWidget(plannedDateLabel);
-
-        plannedDateEdit = new QDateEdit(detailContent);
-        plannedDateEdit->setObjectName("plannedDateEdit");
-        plannedDateEdit->setCalendarPopup(true);
-
-        detailContentLayout->addWidget(plannedDateEdit);
-
-        dueDateLabel = new QLabel(detailContent);
-        dueDateLabel->setObjectName("dueDateLabel");
-        dueDateLabel->setStyleSheet(QString::fromUtf8("font-weight: 500; font-size: 12px; color: #64748b;"));
-
-        detailContentLayout->addWidget(dueDateLabel);
-
-        dueDateEdit = new QDateEdit(detailContent);
-        dueDateEdit->setObjectName("dueDateEdit");
-        dueDateEdit->setCalendarPopup(true);
-
-        detailContentLayout->addWidget(dueDateEdit);
 
         priorityLabel = new QLabel(detailContent);
         priorityLabel->setObjectName("priorityLabel");
@@ -513,22 +484,11 @@ public:
         syncBtn->setToolTip(QCoreApplication::translate("MainWindow", "\345\220\214\346\255\245\346\225\260\346\215\256", nullptr));
 #endif // QT_CONFIG(tooltip)
         detailLabel->setText(QCoreApplication::translate("MainWindow", "\350\257\246\346\203\205", nullptr));
-        emptyStateLabel->setText(QCoreApplication::translate("MainWindow", "\350\257\267\351\200\211\346\213\251\344\270\200\344\270\252\345\276\205\345\212\236\344\272\213\351\241\271\346\237\245\347\234\213\350\257\246\346\203\205\n"
-"\n"
-"\360\237\222\241 \346\217\220\347\244\272\357\274\232\n"
-"\342\200\242 \347\202\271\345\207\273\345\267\246\344\276\247\345\276\205\345\212\236\344\272\213\351\241\271\346\237\245\347\234\213\350\257\246\346\203\205\n"
-"\342\200\242 \347\202\271\345\207\273\"\346\226\260\345\273\272\"\345\210\233\345\273\272\346\226\260\347\232\204\345\276\205\345\212\236\344\272\213\351\241\271\n"
-"\342\200\242 \345\217\214\345\207\273\345\276\205\345\212\236\344\272\213\351\241\271\345\217\257\345\277\253\351\200\237\347\274\226\350\276\221", nullptr));
+        emptyStateLabel->setText(QCoreApplication::translate("MainWindow", "\350\257\267\351\200\211\346\213\251\344\270\200\344\270\252\345\276\205\345\212\236\344\272\213\351\241\271\346\237\245\347\234\213\350\257\246\346\203\205", nullptr));
         titleLabel->setText(QCoreApplication::translate("MainWindow", "\346\240\207\351\242\230", nullptr));
         titleEdit->setPlaceholderText(QCoreApplication::translate("MainWindow", "\350\257\267\350\276\223\345\205\245\346\240\207\351\242\230", nullptr));
         detailsLabel->setText(QCoreApplication::translate("MainWindow", "\350\257\246\346\203\205", nullptr));
         detailsEdit->setPlaceholderText(QCoreApplication::translate("MainWindow", "\350\257\267\350\276\223\345\205\245\350\257\246\347\273\206\346\217\217\350\277\260", nullptr));
-        plannedDateLabel->setText(QCoreApplication::translate("MainWindow", "\350\256\241\345\210\222\346\227\245\346\234\237", nullptr));
-        plannedDateEdit->setDisplayFormat(QCoreApplication::translate("MainWindow", "yyyy-MM-dd", nullptr));
-        plannedDateEdit->setSpecialValueText(QCoreApplication::translate("MainWindow", "\346\234\252\350\256\276\347\275\256", nullptr));
-        dueDateLabel->setText(QCoreApplication::translate("MainWindow", "\346\210\252\346\255\242\346\227\245\346\234\237", nullptr));
-        dueDateEdit->setDisplayFormat(QCoreApplication::translate("MainWindow", "yyyy-MM-dd", nullptr));
-        dueDateEdit->setSpecialValueText(QCoreApplication::translate("MainWindow", "\346\234\252\350\256\276\347\275\256", nullptr));
         priorityLabel->setText(QCoreApplication::translate("MainWindow", "\344\274\230\345\205\210\347\272\247", nullptr));
         priorityComboBox->setItemText(0, QCoreApplication::translate("MainWindow", "\344\275\216\344\274\230\345\205\210\347\272\247", nullptr));
         priorityComboBox->setItemText(1, QCoreApplication::translate("MainWindow", "\344\270\255\344\274\230\345\205\210\347\272\247", nullptr));

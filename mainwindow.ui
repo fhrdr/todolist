@@ -288,7 +288,7 @@
               </property>
               <layout class="QVBoxLayout" name="detailContentLayout">
                <property name="spacing">
-                <number>16</number>
+                <number>8</number>
                </property>
                <property name="leftMargin">
                 <number>0</number>
@@ -305,12 +305,7 @@
                <item>
                 <widget class="QLabel" name="emptyStateLabel">
                  <property name="text">
-                  <string>请选择一个待办事项查看详情
-
-💡 提示：
-• 点击左侧待办事项查看详情
-• 点击"新建"创建新的待办事项
-• 双击待办事项可快速编辑</string>
+                  <string>请选择一个待办事项查看详情</string>
                  </property>
                  <property name="alignment">
                   <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
@@ -319,7 +314,7 @@
                   <bool>true</bool>
                  </property>
                  <property name="styleSheet">
-                  <string notr="true">color: #94a3b8; font-size: 13px; padding: 20px; background-color: #f8fafc; border-radius: 8px;</string>
+                  <string notr="true">color: #94a3b8; font-size: 13px; padding: 16px; background-color: #f8fafc; border-radius: 8px;</string>
                  </property>
                 </widget>
                </item>
@@ -355,34 +350,11 @@
                  <property name="minimumSize">
                   <size>
                    <width>0</width>
-                   <height>80</height>
+                   <height>60</height>
                   </size>
                  </property>
                  <property name="placeholderText">
                   <string>请输入详细描述</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QLabel" name="dueDateLabel">
-                 <property name="text">
-                  <string>截止日期</string>
-                 </property>
-                 <property name="styleSheet">
-                  <string notr="true">font-weight: 500; font-size: 12px; color: #64748b;</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QDateEdit" name="dueDateEdit">
-                 <property name="calendarPopup">
-                  <bool>true</bool>
-                 </property>
-                 <property name="displayFormat">
-                  <string>yyyy-MM-dd</string>
-                 </property>
-                 <property name="specialValueText">
-                  <string>未设置</string>
                  </property>
                 </widget>
                </item>

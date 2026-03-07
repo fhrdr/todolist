@@ -553,16 +553,35 @@ void MainWindow::onNewFolderClicked()
 
 void MainWindow::onFolderSelectionChanged()
 {
-    int row = ui->folderListWidget->currentRow();
-    if (row >= 0 && row < m_folders.size()) {
-        m_currentFolder = &m_folders[row];
-        ui->deleteFolderBtn->setEnabled(true);
-        updateTodoList();
-        updateDetailPanel();
+    QListWidgetItem* selectedItem = ui->folderListWidget->currentItem();
+    if (selectedItem) {
+        QString folderId = selectedItem->data(Qt::UserRole).toString();
+        TodoFolder* foundFolder = nullptr;
+        for (int i = 0; i < m_folders.size(); ++i) {
+            if (m_folders[i].getId() == folderId) {
+                foundFolder = &m_folders[i];
+                break;
+            }
+        }
+        if (foundFolder) {
+            m_currentFolder = foundFolder;
+            ui->deleteFolderBtn->setEnabled(true);
+            updateTodoList();
+            updateDetailPanel();
+        } else {
+            m_currentFolder = nullptr;
+            ui->deleteFolderBtn->setEnabled(false);
+            ui->todoListWidget->blockSignals(true);
+            ui->todoListWidget->clear();
+            ui->todoListWidget->blockSignals(false);
+            clearDetailPanel();
+        }
     } else {
         m_currentFolder = nullptr;
         ui->deleteFolderBtn->setEnabled(false);
+        ui->todoListWidget->blockSignals(true);
         ui->todoListWidget->clear();
+        ui->todoListWidget->blockSignals(false);
         clearDetailPanel();
     }
 }
@@ -597,7 +616,9 @@ void MainWindow::onDeleteFolderClicked()
             updateTagWidget();
             updateDesktopWidget();
             
+            ui->todoListWidget->blockSignals(true);
             ui->todoListWidget->clear();
+            ui->todoListWidget->blockSignals(false);
             clearDetailPanel();
             
             if (!m_folders.isEmpty()) {
@@ -622,14 +643,24 @@ void MainWindow::onPinFolderClicked()
 
 void MainWindow::onFolderDoubleClicked(QListWidgetItem* item)
 {
-    int row = ui->folderListWidget->row(item);
-    if (row >= 0 && row < m_folders.size()) {
+    if (!item) return;
+    
+    QString folderId = item->data(Qt::UserRole).toString();
+    TodoFolder* foundFolder = nullptr;
+    for (int i = 0; i < m_folders.size(); ++i) {
+        if (m_folders[i].getId() == folderId) {
+            foundFolder = &m_folders[i];
+            break;
+        }
+    }
+    
+    if (foundFolder) {
         bool ok;
         QString newName = QInputDialog::getText(this, "重命名文件夹", "请输入新的文件夹名称:", 
-            QLineEdit::Normal, m_folders[row].getName(), &ok);
+            QLineEdit::Normal, foundFolder->getName(), &ok);
         
         if (ok && !newName.isEmpty()) {
-            m_folders[row].setName(newName);
+            foundFolder->setName(newName);
             updateFolderList();
             updateCalendarWidget();
             saveData();
@@ -642,10 +673,17 @@ void MainWindow::onFolderContextMenu(const QPoint &pos)
     QListWidgetItem *item = ui->folderListWidget->itemAt(pos);
     if (!item) return;
     
-    int row = ui->folderListWidget->row(item);
-    if (row < 0 || row >= m_folders.size()) return;
+    QString folderId = item->data(Qt::UserRole).toString();
+    TodoFolder* foundFolder = nullptr;
+    for (int i = 0; i < m_folders.size(); ++i) {
+        if (m_folders[i].getId() == folderId) {
+            foundFolder = &m_folders[i];
+            break;
+        }
+    }
+    if (!foundFolder) return;
     
-    m_currentFolder = &m_folders[row];
+    m_currentFolder = foundFolder;
     
     QMenu menu(this);
     QAction *pinAction = menu.addAction(m_currentFolder->isPinned() ? "取消置顶" : "置顶");
@@ -699,9 +737,8 @@ void MainWindow::onNewTodoClicked()
             updateTagWidget();
             updateDesktopWidget();
             
-            QList<TodoItem> items = m_currentFolder->getItems();
-            for (int i = 0; i < items.size(); ++i) {
-                if (items[i].getId() == newItemId) {
+            for (int i = 0; i < ui->todoListWidget->count(); ++i) {
+                if (ui->todoListWidget->item(i)->data(Qt::UserRole).toString() == newItemId) {
                     ui->todoListWidget->setCurrentRow(i);
                     break;
                 }
@@ -718,14 +755,19 @@ void MainWindow::onTodoSelectionChanged()
 {
     if (!m_currentFolder) return;
     
-    int row = ui->todoListWidget->currentRow();
-    QList<TodoItem> items = m_currentFolder->getItems();
+    QListWidgetItem* currentItem = ui->todoListWidget->currentItem();
+    if (!currentItem) {
+        m_currentItem = nullptr;
+        clearDetailPanel();
+        return;
+    }
     
-    if (row >= 0 && row < items.size()) {
-        m_currentItem = m_currentFolder->findItem(items[row].getId());
+    QString itemId = currentItem->data(Qt::UserRole).toString();
+    m_currentItem = m_currentFolder->findItem(itemId);
+    
+    if (m_currentItem) {
         updateDetailPanel();
     } else {
-        m_currentItem = nullptr;
         clearDetailPanel();
     }
 }
@@ -743,11 +785,10 @@ void MainWindow::onTodoContextMenu(const QPoint &pos)
     QListWidgetItem *item = ui->todoListWidget->itemAt(pos);
     if (!item || !m_currentFolder) return;
     
-    int row = ui->todoListWidget->row(item);
-    QList<TodoItem> items = m_currentFolder->getItems();
-    if (row < 0 || row >= items.size()) return;
+    QString itemId = item->data(Qt::UserRole).toString();
+    m_currentItem = m_currentFolder->findItem(itemId);
     
-    m_currentItem = m_currentFolder->findItem(items[row].getId());
+    if (!m_currentItem) return;
     
     QMenu menu(this);
     QAction *pinAction = menu.addAction(m_currentItem->isPinned() ? "取消置顶" : "置顶");
@@ -808,9 +849,6 @@ void MainWindow::onSaveClicked()
     m_currentItem->setDetails(ui->detailsEdit->toPlainText());
     m_currentItem->setCompleted(ui->completedCheckBox->isChecked());
     
-    if (ui->dueDateEdit) {
-        m_currentItem->setDueDate(ui->dueDateEdit->date());
-    }
     if (ui->priorityComboBox) {
         m_currentItem->setPriority(ui->priorityComboBox->currentIndex());
     }
@@ -866,35 +904,16 @@ void MainWindow::onCompletedToggled(bool completed)
     m_currentItem->setCompleted(completed);
     saveData();
     
-    m_currentFolder = nullptr;
-    m_currentItem = nullptr;
-    
     updateFolderList();
     updateTodoList();
     updateCalendarWidget();
     updateTagWidget();
     updateDesktopWidget();
     
-    for (int i = 0; i < m_folders.size(); ++i) {
-        if (m_folders[i].getId() == currentFolderId) {
-            m_currentFolder = &m_folders[i];
-            TodoItem* item = m_currentFolder->findItem(currentItemId);
-            if (item) {
-                m_currentItem = item;
-                ui->folderListWidget->setCurrentRow(i);
-                for (int j = 0; j < ui->todoListWidget->count(); ++j) {
-                    if (ui->todoListWidget->item(j)->data(Qt::UserRole).toString() == currentItemId) {
-                        ui->todoListWidget->setCurrentRow(j);
-                        break;
-                    }
-                }
-            }
-            break;
-        }
+    if (m_currentItem) {
+        updateDetailPanel();
+        updateTodoTags();
     }
-    
-    updateDetailPanel();
-    updateTodoTags();
 }
 
 void MainWindow::onSyncClicked()
@@ -942,9 +961,21 @@ void MainWindow::onTodoTagRemoved(const QString &todoId, const QString &tag)
 void MainWindow::updateFolderList()
 {
     QString currentFolderId;
-    if (m_currentFolder) {
-        currentFolderId = m_currentFolder->getId();
+    QListWidgetItem* selectedFolderItem = ui->folderListWidget->currentItem();
+    if (selectedFolderItem) {
+        currentFolderId = selectedFolderItem->data(Qt::UserRole).toString();
     }
+    
+    QString currentItemId;
+    QListWidgetItem* selectedTodoItem = ui->todoListWidget->currentItem();
+    if (selectedTodoItem) {
+        currentItemId = selectedTodoItem->data(Qt::UserRole).toString();
+    }
+    
+    ui->folderListWidget->blockSignals(true);
+    
+    m_currentFolder = nullptr;
+    m_currentItem = nullptr;
     
     ui->folderListWidget->clear();
     
@@ -978,24 +1009,35 @@ void MainWindow::updateFolderList()
         if (folder.getId() == currentFolderId) {
             selectRow = i;
             m_currentFolder = &m_folders[i];
+            if (!currentItemId.isEmpty()) {
+                m_currentItem = m_currentFolder->findItem(currentItemId);
+            }
         }
     }
     
     if (selectRow >= 0) {
         ui->folderListWidget->setCurrentRow(selectRow);
     }
+    
+    ui->folderListWidget->blockSignals(false);
 }
 
 void MainWindow::updateTodoList()
 {
     QString currentItemId;
-    if (m_currentItem) {
-        currentItemId = m_currentItem->getId();
+    QListWidgetItem* selectedTodoItem = ui->todoListWidget->currentItem();
+    if (selectedTodoItem) {
+        currentItemId = selectedTodoItem->data(Qt::UserRole).toString();
     }
+    
+    ui->todoListWidget->blockSignals(true);
     
     ui->todoListWidget->clear();
     
-    if (!m_currentFolder) return;
+    if (!m_currentFolder) {
+        ui->todoListWidget->blockSignals(false);
+        return;
+    }
     
     QList<TodoItem> items = m_currentFolder->getItems();
     std::sort(items.begin(), items.end(), [](const TodoItem &a, const TodoItem &b) {
@@ -1033,19 +1075,7 @@ void MainWindow::updateTodoList()
             subText = QString::fromUtf8("还没有写任何内容呢~");
         }
         
-        QString dateText;
-        if (item.getDueDate().isValid()) {
-            QDate today = QDate::currentDate();
-            if (item.getDueDate() < today && !item.isCompleted()) {
-                dateText = "⚠ " + item.getDueDate().toString("MM-dd");
-            } else {
-                dateText = item.getDueDate().toString("MM-dd");
-            }
-        } else if (item.getPlannedDate().isValid()) {
-            dateText = item.getPlannedDate().toString("MM-dd");
-        }
-        
-        QString fullText = displayText + "\t" + dateText + "\n" + subText;
+        QString fullText = displayText + "\n" + subText;
         
         QListWidgetItem *listItem = new QListWidgetItem();
         listItem->setText(fullText);
@@ -1066,6 +1096,8 @@ void MainWindow::updateTodoList()
     if (selectRow >= 0) {
         ui->todoListWidget->setCurrentRow(selectRow);
     }
+    
+    ui->todoListWidget->blockSignals(false);
 }
 
 void MainWindow::updateDetailPanel()
@@ -1100,15 +1132,6 @@ void MainWindow::updateDetailPanel()
     }
     
     ui->completedCheckBox->setChecked(m_currentItem->isCompleted());
-    
-    if (ui->dueDateEdit) {
-        if (m_currentItem->getDueDate().isValid()) {
-            ui->dueDateEdit->setDate(m_currentItem->getDueDate());
-        } else {
-            ui->dueDateEdit->setDate(QDate::currentDate());
-        }
-        ui->dueDateEdit->setEnabled(true);
-    }
     
     if (ui->priorityComboBox) {
         int priority = qBound(0, m_currentItem->getPriority(), 2);
@@ -1157,10 +1180,6 @@ void MainWindow::clearDetailPanel()
     ui->completedTimeLabel->setVisible(false);
     ui->completedCheckBox->setChecked(false);
     
-    if (ui->dueDateEdit) {
-        ui->dueDateEdit->setDate(QDate::currentDate());
-        ui->dueDateEdit->setEnabled(false);
-    }
     if (ui->priorityComboBox) {
         ui->priorityComboBox->setCurrentIndex(0);
         ui->priorityComboBox->setEnabled(false);
@@ -1361,9 +1380,9 @@ void MainWindow::setupTagWidget()
                 TodoItem* item = m_currentFolder->findItem(todoId);
                 if (item) {
                     m_currentItem = item;
-                    QList<TodoItem> items = m_folders[i].getItems();
-                    for (int j = 0; j < items.size(); ++j) {
-                        if (items[j].getId() == todoId) {
+                    updateTodoList();
+                    for (int j = 0; j < ui->todoListWidget->count(); ++j) {
+                        if (ui->todoListWidget->item(j)->data(Qt::UserRole).toString() == todoId) {
                             ui->todoListWidget->setCurrentRow(j);
                             break;
                         }
@@ -1438,31 +1457,41 @@ bool MainWindow::toggleTodoCompleted(const QString &itemId, bool completed)
     saveData();
     
     bool wasCurrentItem = (m_currentItem && m_currentItem->getId() == itemId);
-    bool wasCurrentFolder = (m_currentFolder && m_currentFolder->getId() == folderId);
+    QString currentFolderId = m_currentFolder ? m_currentFolder->getId() : "";
+    QString currentItemId = m_currentItem ? m_currentItem->getId() : "";
     
     m_currentItem = nullptr;
     m_currentFolder = nullptr;
     
-    refreshAllViews();
+    updateFolderList();
     
-    if (wasCurrentFolder && wasCurrentItem) {
+    if (!currentFolderId.isEmpty()) {
         for (int i = 0; i < m_folders.size(); ++i) {
-            if (m_folders[i].getId() == folderId) {
+            if (m_folders[i].getId() == currentFolderId) {
                 m_currentFolder = &m_folders[i];
-                TodoItem* foundItem = m_currentFolder->findItem(itemId);
-                if (foundItem) {
-                    m_currentItem = foundItem;
-                    ui->folderListWidget->setCurrentRow(i);
-                    for (int j = 0; j < ui->todoListWidget->count(); ++j) {
-                        if (ui->todoListWidget->item(j)->data(Qt::UserRole).toString() == itemId) {
-                            ui->todoListWidget->setCurrentRow(j);
-                            break;
-                        }
-                    }
-                }
+                ui->folderListWidget->setCurrentRow(i);
                 break;
             }
         }
+    }
+    
+    updateTodoList();
+    
+    if (m_currentFolder && !currentItemId.isEmpty()) {
+        for (int j = 0; j < ui->todoListWidget->count(); ++j) {
+            if (ui->todoListWidget->item(j)->data(Qt::UserRole).toString() == currentItemId) {
+                ui->todoListWidget->setCurrentRow(j);
+                m_currentItem = m_currentFolder->findItem(currentItemId);
+                break;
+            }
+        }
+    }
+    
+    updateCalendarWidget();
+    updateTagWidget();
+    updateDesktopWidget();
+    
+    if (wasCurrentItem && m_currentItem) {
         updateDetailPanel();
     }
     
@@ -1472,19 +1501,17 @@ bool MainWindow::toggleTodoCompleted(const QString &itemId, bool completed)
 bool MainWindow::deleteTodoItem(const QString &itemId)
 {
     for (int i = 0; i < m_folders.size(); ++i) {
-        QList<TodoItem> items = m_folders[i].getItems();
-        for (int j = 0; j < items.size(); ++j) {
-            if (items[j].getId() == itemId) {
-                m_folders[i].removeItem(itemId);
-                
-                if (m_currentItem && m_currentItem->getId() == itemId) {
-                    m_currentItem = nullptr;
-                }
-                
-                saveData();
-                refreshAllViews();
-                return true;
+        TodoItem* item = m_folders[i].findItem(itemId);
+        if (item) {
+            m_folders[i].removeItem(itemId);
+            
+            if (m_currentItem && m_currentItem->getId() == itemId) {
+                m_currentItem = nullptr;
             }
+            
+            saveData();
+            refreshAllViews();
+            return true;
         }
     }
     return false;

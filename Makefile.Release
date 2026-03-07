@@ -20,7 +20,7 @@ INCPATH       = -I. -ID:/Qt/qt6/6.8.3/mingw_64/include -ID:/Qt/qt6/6.8.3/mingw_6
 LINKER      =        g++
 LFLAGS        =        -Wl,-s -Wl,-subsystem,windows -mthreads
 LIBS        =        D:\Qt\qt6\6.8.3\mingw_64\lib\libQt6Widgets.a D:\Qt\qt6\6.8.3\mingw_64\lib\libQt6Gui.a D:\Qt\qt6\6.8.3\mingw_64\lib\libQt6Sql.a D:\Qt\qt6\6.8.3\mingw_64\lib\libQt6Core.a release\todolist_resource_res.o -lmingw32 D:\Qt\qt6\6.8.3\mingw_64\lib\libQt6EntryPoint.a -lshell32  
-QMAKE         = D:\Qt\qt6\6.8.3\mingw_64\bin\qmake6.exe
+QMAKE         = D:\Qt\qt6\6.8.3\mingw_64\bin\qmake.exe
 DEL_FILE      = del
 CHK_DIR_EXISTS= if not exist
 MKDIR         = mkdir
@@ -30,8 +30,8 @@ COPY_DIR      = xcopy /s /q /y /i
 INSTALL_FILE  = copy /y
 INSTALL_PROGRAM = copy /y
 INSTALL_DIR   = xcopy /s /q /y /i
-QINSTALL      = D:\Qt\qt6\6.8.3\mingw_64\bin\qmake6.exe -install qinstall
-QINSTALL_PROGRAM = D:\Qt\qt6\6.8.3\mingw_64\bin\qmake6.exe -install qinstall -exe
+QINSTALL      = D:\Qt\qt6\6.8.3\mingw_64\bin\qmake.exe -install qinstall
+QINSTALL_PROGRAM = D:\Qt\qt6\6.8.3\mingw_64\bin\qmake.exe -install qinstall -exe
 DEL_FILE      = del
 SYMLINK       = $(QMAKE) -install ln -f -s
 DEL_DIR       = rmdir
@@ -1833,6 +1833,8 @@ release/mainwindow.o: mainwindow.cpp mainwindow.h \
 		D:/Qt/qt6/6.8.3/mingw_64/include/QtWidgets/qapplication.h \
 		D:/Qt/qt6/6.8.3/mingw_64/include/QtWidgets/QCheckBox \
 		D:/Qt/qt6/6.8.3/mingw_64/include/QtWidgets/qcheckbox.h \
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtWidgets/QComboBox \
+		D:/Qt/qt6/6.8.3/mingw_64/include/QtWidgets/qcombobox.h \
 		D:/Qt/qt6/6.8.3/mingw_64/include/QtWidgets/QMenuBar \
 		D:/Qt/qt6/6.8.3/mingw_64/include/QtWidgets/qmenubar.h \
 		D:/Qt/qt6/6.8.3/mingw_64/include/QtWidgets/QSpacerItem \
