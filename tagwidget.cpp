@@ -13,14 +13,14 @@ namespace {
     QColor getRandomTagColor()
     {
         static QList<QColor> colors = {
-            QColor(59, 130, 246),
-            QColor(16, 185, 129),
-            QColor(249, 115, 22),
-            QColor(239, 68, 68),
-            QColor(139, 92, 246),
-            QColor(6, 182, 212),
-            QColor(234, 179, 8),
-            QColor(99, 102, 241),
+            QColor(96, 165, 250),
+            QColor(74, 222, 128),
+            QColor(251, 146, 60),
+            QColor(248, 113, 113),
+            QColor(167, 139, 250),
+            QColor(34, 211, 238),
+            QColor(250, 204, 21),
+            QColor(129, 140, 248),
         };
         return colors[QRandomGenerator::global()->bounded(colors.size())];
     }
@@ -121,23 +121,24 @@ void TagListItem::paintEvent(QPaintEvent *event)
     countFont.setPixelSize(12);
     painter.setFont(countFont);
     painter.setPen(QColor(100, 116, 139));
-    QString countText = QString("(%1)").arg(m_count);
-    painter.drawText(QRect(width() - 90, 0, 40, height()), Qt::AlignRight | Qt::AlignVCenter, countText);
+    QString countText = QString("（%1）").arg(m_count);
+    painter.drawText(QRect(width() - 80, 0, 40, height()), Qt::AlignRight | Qt::AlignVCenter, countText);
     
-    m_deleteRect = QRect(width() - 40, (height() - 20) / 2, 20, 20);
+    int btnSize = 18;
+    int rightPadding = 10;
+    int btnLeft = width() - rightPadding - btnSize;
+    int btnTop = (height() - btnSize) / 2 + 2;
+    m_deleteRect = QRect(btnLeft, btnTop, btnSize, btnSize);
     painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(255, 255, 255));
-    painter.drawRoundedRect(m_deleteRect, 4, 4);
-    painter.setPen(QPen(QColor(239, 68, 68), 1.5));
-    painter.setBrush(Qt::NoBrush);
-    painter.drawRoundedRect(m_deleteRect, 4, 4);
+    painter.setBrush(QColor(254, 226, 226));
+    painter.drawRoundedRect(m_deleteRect, 9, 9);
     
-    painter.setPen(QColor(239, 68, 68));
-    QFont delFont;
-    delFont.setPixelSize(12);
-    delFont.setBold(true);
-    painter.setFont(delFont);
-    painter.drawText(m_deleteRect, Qt::AlignCenter, "×");
+    painter.setPen(QPen(QColor(239, 68, 68), 2));
+    int margin = 5;
+    painter.drawLine(m_deleteRect.left() + margin, m_deleteRect.top() + margin, 
+                     m_deleteRect.right() - margin, m_deleteRect.bottom() - margin);
+    painter.drawLine(m_deleteRect.right() - margin, m_deleteRect.top() + margin, 
+                     m_deleteRect.left() + margin, m_deleteRect.bottom() - margin);
 }
 
 TodoItemWidget::TodoItemWidget(const TodoItem &item, const QString &folderName, QWidget *parent)
@@ -244,8 +245,10 @@ void TodoItemWidget::paintEvent(QPaintEvent *event)
     painter.setFont(detailFont);
     painter.setPen(QColor(148, 163, 184));
     
+    QFontMetrics detailFm(detailFont);
     QString detailText = m_details.isEmpty() ? QString::fromUtf8("还没有写任何内容呢~") : m_details;
-    QString elidedDetail = fm.elidedText(detailText, Qt::ElideRight, width() - 120);
+    detailText = detailText.split('\n').first();
+    QString elidedDetail = detailFm.elidedText(detailText, Qt::ElideRight, width() - 120);
     painter.drawText(QRect(44, 30, width() - 120, 18), Qt::AlignLeft | Qt::AlignVCenter, elidedDetail);
     
     QFont infoFont;
@@ -297,19 +300,25 @@ void TagWidget::setupUI()
     leftLayout->setSpacing(16);
     
     m_cloudPanel = new QWidget();
-    m_cloudPanel->setStyleSheet("background-color: transparent;");
+    m_cloudPanel->setStyleSheet("background-color: #ffffff; border: none;");
     m_cloudLayout = new QVBoxLayout(m_cloudPanel);
     m_cloudLayout->setContentsMargins(0, 0, 0, 0);
-    m_cloudLayout->setSpacing(8);
+    m_cloudLayout->setSpacing(0);
+    
+    QWidget *cloudHeader = new QWidget();
+    cloudHeader->setStyleSheet("background-color: #ffffff; border-bottom: 1px solid #e2e8f0;");
+    cloudHeader->setFixedHeight(40);
+    QHBoxLayout *cloudHeaderLayout = new QHBoxLayout(cloudHeader);
+    cloudHeaderLayout->setContentsMargins(20, 8, 20, 8);
     
     m_cloudTitle = new QLabel("标签云");
     m_cloudTitle->setStyleSheet("font-size: 14px; font-weight: 600; color: #1e293b; border: none;");
-    m_cloudTitle->setFixedHeight(24);
-    m_cloudLayout->addWidget(m_cloudTitle);
+    cloudHeaderLayout->addWidget(m_cloudTitle);
+    m_cloudLayout->addWidget(cloudHeader);
     
     m_cloudContainer = new QWidget();
     m_cloudContainer->setStyleSheet("background-color: transparent;");
-    m_cloudFlow = new QFlowLayout(m_cloudContainer, 8, 8, 8);
+    m_cloudFlow = new QFlowLayout(m_cloudContainer, 8, 12, 12);
     m_cloudLayout->addWidget(m_cloudContainer);
     
     leftLayout->addWidget(m_cloudPanel, 1);

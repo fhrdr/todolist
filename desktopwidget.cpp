@@ -113,8 +113,9 @@ void DesktopWidget::applyStyles()
     );
     
     m_addButton->setStyleSheet(
-        "QPushButton { background-color: #6366f1; color: white; border: none; border-radius: 8px; padding: 10px 16px; font-weight: 500; }"
-        "QPushButton:hover { background-color: #4f46e5; }"
+        "QPushButton { background-color: #ffffff; color: #3b82f6; border: 2px solid #3b82f6; border-radius: 8px; padding: 8px 14px; font-weight: 500; }"
+        "QPushButton:hover { background-color: rgba(59, 130, 246, 0.1); }"
+        "QPushButton:pressed { background-color: rgba(59, 130, 246, 0.2); }"
     );
 }
 

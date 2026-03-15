@@ -261,15 +261,20 @@ void CalendarGrid::setupUI()
     m_gridLayout->setContentsMargins(0, 0, 0, 0);
     m_gridLayout->setSpacing(2);
     
-    for (int i = 0; i < 42; ++i) {
-        CalendarCell *cell = new CalendarCell();
-        m_cells.append(cell);
-        m_gridLayout->addWidget(cell, i / 7, i % 7);
-        connect(cell, &CalendarCell::clicked, this, &CalendarGrid::dateClicked);
-        connect(cell, &CalendarCell::todoClicked, this, &CalendarGrid::todoClicked);
+    for (int row = 0; row < 6; ++row) {
+        m_gridLayout->setRowMinimumHeight(row, 80);
+        for (int col = 0; col < 7; ++col) {
+            CalendarCell *cell = new CalendarCell();
+            m_cells.append(cell);
+            m_gridLayout->addWidget(cell, row, col);
+            m_gridLayout->setRowStretch(row, 1);
+            m_gridLayout->setColumnStretch(col, 1);
+            connect(cell, &CalendarCell::clicked, this, &CalendarGrid::dateClicked);
+            connect(cell, &CalendarCell::todoClicked, this, &CalendarGrid::todoClicked);
+        }
     }
     
-    m_mainLayout->addWidget(m_gridWidget);
+    m_mainLayout->addWidget(m_gridWidget, 1);
     
     connect(m_prevBtn, &QPushButton::clicked, this, &CalendarGrid::onPrevMonth);
     connect(m_nextBtn, &QPushButton::clicked, this, &CalendarGrid::onNextMonth);
@@ -563,10 +568,10 @@ void CalendarWidget::setupUI()
     m_addLayout->addWidget(m_addLineEdit, 1);
     
     QString btnStyle = 
-        "QPushButton { background-color: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; "
-        "padding: 8px 16px; color: #475569; font-size: 13px; font-weight: 500; }"
-        "QPushButton:hover { background-color: #e2e8f0; border-color: #cbd5e1; }"
-        "QPushButton:pressed { background-color: #cbd5e1; }";
+        "QPushButton { background-color: #ffffff; border: 2px solid #22c55e; border-radius: 8px; "
+        "padding: 8px 16px; color: #22c55e; font-size: 13px; font-weight: 500; }"
+        "QPushButton:hover { background-color: rgba(34, 197, 94, 0.1); }"
+        "QPushButton:pressed { background-color: rgba(34, 197, 94, 0.2); }";
     
     m_addButton = new QPushButton("添加");
     m_addButton->setStyleSheet(btnStyle);
@@ -582,10 +587,10 @@ void CalendarWidget::setupUI()
     
     m_toggleButton = new QPushButton("完成");
     m_toggleButton->setStyleSheet(
-        "QPushButton { background-color: #ffffff; border: 2px solid #22c55e; border-radius: 8px; "
-        "padding: 8px 16px; color: #22c55e; font-size: 13px; font-weight: 500; }"
-        "QPushButton:hover { background-color: rgba(34, 197, 94, 0.1); }"
-        "QPushButton:pressed { background-color: rgba(34, 197, 94, 0.2); }"
+        "QPushButton { background-color: #ffffff; border: 2px solid #3b82f6; border-radius: 8px; "
+        "padding: 8px 16px; color: #3b82f6; font-size: 13px; font-weight: 500; }"
+        "QPushButton:hover { background-color: rgba(59, 130, 246, 0.1); }"
+        "QPushButton:pressed { background-color: rgba(59, 130, 246, 0.2); }"
         "QPushButton:disabled { background-color: #ffffff; color: #94a3b8; border-color: #e2e8f0; }"
     );
     m_toggleButton->setEnabled(false);
@@ -593,10 +598,10 @@ void CalendarWidget::setupUI()
     
     m_deleteButton = new QPushButton("删除");
     m_deleteButton->setStyleSheet(
-        "QPushButton { background-color: #ffffff; border: 2px solid #3b82f6; border-radius: 8px; "
-        "padding: 8px 16px; color: #3b82f6; font-size: 13px; font-weight: 500; }"
-        "QPushButton:hover { background-color: rgba(59, 130, 246, 0.1); }"
-        "QPushButton:pressed { background-color: rgba(59, 130, 246, 0.2); }"
+        "QPushButton { background-color: #ffffff; border: 2px solid #f59e0b; border-radius: 8px; "
+        "padding: 8px 16px; color: #f59e0b; font-size: 13px; font-weight: 500; }"
+        "QPushButton:hover { background-color: rgba(245, 158, 11, 0.1); }"
+        "QPushButton:pressed { background-color: rgba(245, 158, 11, 0.2); }"
         "QPushButton:disabled { background-color: #ffffff; color: #94a3b8; border-color: #e2e8f0; }"
     );
     m_deleteButton->setEnabled(false);
