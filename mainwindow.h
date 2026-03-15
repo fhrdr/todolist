@@ -113,7 +113,6 @@ private:
     void saveData();
     void migrateFromJson();
     TodoFolder* findFolderById(const QString &folderId);
-    TodoFolder* findOrCreateTodayFolder();
     
     void setupConnections();
     void initializeData();

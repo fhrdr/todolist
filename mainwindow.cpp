@@ -358,7 +358,8 @@ MainWindow::~MainWindow()
 void MainWindow::initDatabase()
 {
     try {
-        QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        QString appPath = QCoreApplication::applicationDirPath();
+        QString dataPath = appPath + "/data";
         QDir dir(dataPath);
         if (!dir.exists()) {
             if (!dir.mkpath(".")) {
@@ -1479,11 +1480,26 @@ void MainWindow::updateDesktopWidget()
 
 void MainWindow::onDesktopNewTodo(const QString &title)
 {
-    TodoFolder* todayFolder = findOrCreateTodayFolder();
+    QString todayString = QDate::currentDate().toString("yyyy-MM-dd");
+    
+    int folderIndex = -1;
+    for (int i = 0; i < m_folders.size(); ++i) {
+        if (m_folders[i].getName() == todayString) {
+            folderIndex = i;
+            break;
+        }
+    }
+    
+    if (folderIndex == -1) {
+        TodoFolder todayFolder(todayString);
+        m_folders.append(todayFolder);
+        folderIndex = m_folders.size() - 1;
+    }
     
     TodoItem newItem(title);
     newItem.setPlannedDate(QDate::currentDate());
-    todayFolder->addItem(newItem);
+    newItem.setDueDate(QDate::currentDate());
+    m_folders[folderIndex].addItem(newItem);
     
     saveData();
     updateFolderList();
@@ -1737,24 +1753,6 @@ TodoFolder* MainWindow::findFolderById(const QString &folderId)
         }
     }
     return nullptr;
-}
-
-TodoFolder* MainWindow::findOrCreateTodayFolder()
-{
-    QString todayString = QDate::currentDate().toString("yyyy-MM-dd");
-    
-    for (TodoFolder &folder : m_folders) {
-        if (folder.getName() == todayString) {
-            return &folder;
-        }
-    }
-    
-    TodoFolder todayFolder(todayString);
-    m_folders.append(todayFolder);
-    
-    updateFolderList();
-    
-    return &m_folders.last();
 }
 
 void MainWindow::setupSystemTray()
