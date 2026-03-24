@@ -14,6 +14,9 @@
 #include <QDialog>
 #include <QLabel>
 #include <QPushButton>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QDragMoveEvent>
 
 namespace {
     QString showInputDialog(QWidget *parent, const QString &title, const QString &label, QString defaultValue = "")
@@ -349,6 +352,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_showAction(nullptr)
     , m_exitAction(nullptr)
     , m_mainSplitter(nullptr)
+    , m_dragHoverItem(nullptr)
 {
     ui->setupUi(this);
     
@@ -713,11 +717,17 @@ void MainWindow::setupConnections()
     connect(ui->folderListWidget, &QListWidget::currentRowChanged, this, &MainWindow::onFolderSelectionChanged);
     connect(ui->folderListWidget, &QListWidget::itemDoubleClicked, this, &MainWindow::onFolderDoubleClicked);
     ui->folderListWidget->setContextMenuPolicy(Qt::CustomContextMenu);
+    ui->folderListWidget->setDragDropMode(QAbstractItemView::NoDragDrop);
+    ui->folderListWidget->setAcceptDrops(false);
+    ui->folderListWidget->viewport()->setAcceptDrops(true);
+    ui->folderListWidget->viewport()->installEventFilter(this);
     connect(ui->folderListWidget, &QListWidget::customContextMenuRequested, this, &MainWindow::onFolderContextMenu);
     
     connect(ui->newTodoBtn, &QPushButton::clicked, this, &MainWindow::onNewTodoClicked);
     connect(ui->todoListWidget, &QListWidget::currentRowChanged, this, &MainWindow::onTodoSelectionChanged);
     ui->todoListWidget->setContextMenuPolicy(Qt::CustomContextMenu);
+    ui->todoListWidget->setDragEnabled(true);
+    ui->todoListWidget->setDragDropMode(QAbstractItemView::DragOnly);
     connect(ui->todoListWidget, &QListWidget::customContextMenuRequested, this, &MainWindow::onTodoContextMenu);
     connect(ui->todoListWidget, &QListWidget::itemDoubleClicked, this, &MainWindow::onTodoDoubleClicked);
     connect(ui->saveBtn, &QPushButton::clicked, this, &MainWindow::onSaveClicked);
@@ -1992,6 +2002,88 @@ void MainWindow::onAboutToQuit()
     if (m_desktopWidget) {
         m_desktopWidget->close();
     }
+}
+
+bool MainWindow::eventFilter(QObject *obj, QEvent *event)
+{
+    if (obj == ui->folderListWidget->viewport()) {
+        if (event->type() == QEvent::DragEnter) {
+            QDragEnterEvent *dragEnterEvent = static_cast<QDragEnterEvent*>(event);
+            if (dragEnterEvent->source() == ui->todoListWidget) {
+                dragEnterEvent->accept();
+                return true;
+            }
+        }
+        else if (event->type() == QEvent::DragMove) {
+            QDragMoveEvent *dragMoveEvent = static_cast<QDragMoveEvent*>(event);
+            QListWidgetItem *targetItem = ui->folderListWidget->itemAt(dragMoveEvent->position().toPoint());
+            
+            if (targetItem != m_dragHoverItem) {
+                if (m_dragHoverItem) {
+                    m_dragHoverItem->setBackground(QColor(255, 255, 255));
+                }
+                m_dragHoverItem = targetItem;
+                if (m_dragHoverItem) {
+                    m_dragHoverItem->setBackground(QColor(219, 234, 254));
+                }
+            }
+            dragMoveEvent->accept();
+            return true;
+        }
+        else if (event->type() == QEvent::DragLeave) {
+            if (m_dragHoverItem) {
+                m_dragHoverItem->setBackground(QColor(255, 255, 255));
+                m_dragHoverItem = nullptr;
+            }
+            return true;
+        }
+        else if (event->type() == QEvent::Drop) {
+            QDropEvent *dropEvent = static_cast<QDropEvent*>(event);
+            QListWidgetItem *targetItem = ui->folderListWidget->itemAt(dropEvent->position().toPoint());
+            
+            if (m_dragHoverItem) {
+                m_dragHoverItem->setBackground(QColor(255, 255, 255));
+                m_dragHoverItem = nullptr;
+            }
+            
+            if (targetItem) {
+                QString targetFolderId = targetItem->data(Qt::UserRole).toString();
+                
+                if (m_currentItem && m_currentFolder) {
+                    QString currentFolderId = m_currentFolder->getId();
+                    if (targetFolderId != currentFolderId) {
+                        TodoFolder *targetFolder = findFolderById(targetFolderId);
+                        if (targetFolder) {
+                            TodoItem itemCopy = *m_currentItem;
+                            m_currentFolder->removeItem(m_currentItem->getId());
+                            targetFolder->addItem(itemCopy);
+                            
+                            m_currentFolder = targetFolder;
+                            m_currentItem = targetFolder->findItem(itemCopy.getId());
+                            
+                            saveData();
+                            updateFolderList();
+                            updateTodoList();
+                            updateDetailPanel();
+                            updateDesktopWidget();
+                            updateCalendarWidget();
+                            updateTagWidget();
+                            
+                            for (int i = 0; i < ui->folderListWidget->count(); ++i) {
+                                if (ui->folderListWidget->item(i)->data(Qt::UserRole).toString() == targetFolderId) {
+                                    ui->folderListWidget->setCurrentRow(i);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            dropEvent->accept();
+            return true;
+        }
+    }
+    return QMainWindow::eventFilter(obj, event);
 }
 
 void MainWindow::setupSplitter()

@@ -94,6 +94,7 @@ private:
     
     QSqlDatabase m_db;
     QSplitter *m_mainSplitter;
+    QListWidgetItem *m_dragHoverItem;
     
     void updateFolderList();
     void updateTodoList();
@@ -126,5 +127,6 @@ private:
     void loadSplitterState();
     
     void closeEvent(QCloseEvent *event) override;
+    bool eventFilter(QObject *obj, QEvent *event) override;
 };
 #endif // MAINWINDOW_H
