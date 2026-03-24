@@ -138,6 +138,48 @@ namespace {
         comboBox->addItems(items);
         comboBox->setCurrentIndex(current);
         comboBox->setEditable(editable);
+        comboBox->setMaxVisibleItems(10);
+        comboBox->setStyleSheet(R"(
+            QComboBox {
+                border: 1px solid #e2e8f0;
+                border-radius: 6px;
+                padding: 8px 30px 8px 12px;
+                background-color: #ffffff;
+                color: #334155;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 24px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #ffffff;
+                border: 1px solid #e2e8f0;
+                selection-background-color: #f1f5f9;
+                selection-color: #334155;
+                outline: none;
+            }
+            QComboBox QAbstractItemView::item {
+                padding: 6px 12px;
+                min-height: 24px;
+            }
+            QComboBox QAbstractItemView::item:hover {
+                background-color: #f1f5f9;
+            }
+            QScrollBar:vertical {
+                border: none;
+                background-color: #f1f5f9;
+                width: 8px;
+                margin: 0;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #cbd5e1;
+                border-radius: 4px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: #94a3b8;
+            }
+        )");
         layout->addWidget(comboBox);
         
         QDialogButtonBox *buttonBox = new QDialogButtonBox();
@@ -591,6 +633,8 @@ void MainWindow::saveData()
             }
         }
         
+        m_db.transaction();
+        
         QSqlQuery query;
         
         if (!query.exec("DELETE FROM item_tags")) {
@@ -648,9 +692,16 @@ void MainWindow::saveData()
                 }
             }
         }
+        
+        if (!m_db.commit()) {
+            m_db.rollback();
+            qWarning() << "数据库提交失败";
+        }
     } catch (const std::exception &e) {
+        m_db.rollback();
         MessageUtils::showError(this, "保存异常", QString("保存数据发生异常: %1").arg(e.what()));
     } catch (...) {
+        m_db.rollback();
         MessageUtils::showError(this, "保存异常", "保存数据发生未知异常");
     }
 }
@@ -717,6 +768,8 @@ void MainWindow::setupConnections()
     connect(ui->actionExport, &QAction::triggered, this, &MainWindow::onExportClicked);
     connect(ui->actionExit, &QAction::triggered, this, &MainWindow::onExitClicked);
     connect(ui->actionDesktopWidget, &QAction::triggered, this, &MainWindow::onDesktopWidgetClicked);
+    
+    connect(qApp, &QApplication::aboutToQuit, this, &MainWindow::onAboutToQuit);
 }
 
 void MainWindow::onNewFolderClicked()
@@ -1929,6 +1982,15 @@ void MainWindow::closeEvent(QCloseEvent *event)
     } else {
         saveData();
         event->accept();
+    }
+}
+
+void MainWindow::onAboutToQuit()
+{
+    saveData();
+    saveSplitterState();
+    if (m_desktopWidget) {
+        m_desktopWidget->close();
     }
 }
 

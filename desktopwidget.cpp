@@ -7,6 +7,7 @@
 #include <QScreen>
 #include <QSettings>
 #include <QMenu>
+#include <algorithm>
 
 DesktopWidget::DesktopWidget(QWidget *parent)
     : QWidget(parent)
@@ -62,7 +63,7 @@ void DesktopWidget::setupUI()
     m_headerLayout->addWidget(m_titleLabel);
     
     m_countLabel = new QLabel();
-    m_countLabel->setStyleSheet("font-size: 12px; color: #6366f1; font-weight: 500;");
+    m_countLabel->setStyleSheet("font-size: 12px; color: #3b82f6; font-weight: 500;");
     m_headerLayout->addWidget(m_countLabel);
     
     m_headerLayout->addStretch();
@@ -130,16 +131,24 @@ void DesktopWidget::loadPendingItems()
 {
     m_displayItems.clear();
     
-    int count = 0;
     for (const TodoFolder &folder : m_folders) {
         QList<TodoItem> items = folder.getItems();
         for (const TodoItem &item : items) {
-            if (!item.isCompleted() && count < 10) {
+            if (!item.isCompleted()) {
                 m_displayItems.append(item);
-                count++;
             }
         }
-        if (count >= 10) break;
+    }
+    
+    std::sort(m_displayItems.begin(), m_displayItems.end(), [](const TodoItem &a, const TodoItem &b) {
+        if (a.isPinned() != b.isPinned()) {
+            return a.isPinned() > b.isPinned();
+        }
+        return a.getCreatedTime() > b.getCreatedTime();
+    });
+    
+    if (m_displayItems.size() > 10) {
+        m_displayItems = m_displayItems.mid(0, 10);
     }
 }
 

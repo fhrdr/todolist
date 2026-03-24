@@ -73,6 +73,7 @@ private slots:
     void onTrayIconActivated(QSystemTrayIcon::ActivationReason reason);
     void onShowFromTray();
     void onExitFromTray();
+    void onAboutToQuit();
 
 private:
     Ui::MainWindow *ui;
