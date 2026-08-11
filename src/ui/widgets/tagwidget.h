@@ -14,6 +14,7 @@
 #include <QMap>
 #include "todoitem.h"
 #include "todofolder.h"
+#include "../components/flowlayout.h"
 
 class TagCloudItem : public QWidget
 {
@@ -88,37 +89,6 @@ private:
     QStringList m_tags;
 };
 
-class QFlowLayout : public QLayout
-{
-    Q_OBJECT
-
-public:
-    explicit QFlowLayout(QWidget *parent, int margin = -1, int hSpacing = -1, int vSpacing = -1);
-    explicit QFlowLayout(int margin = -1, int hSpacing = -1, int vSpacing = -1);
-    ~QFlowLayout() override;
-
-    void addItem(QLayoutItem *item) override;
-    int horizontalSpacing() const;
-    int verticalSpacing() const;
-    Qt::Orientations expandingDirections() const override;
-    bool hasHeightForWidth() const override;
-    int heightForWidth(int) const override;
-    int count() const override;
-    QLayoutItem *itemAt(int index) const override;
-    QSize minimumSize() const override;
-    void setGeometry(const QRect &rect) override;
-    QSize sizeHint() const override;
-    QLayoutItem *takeAt(int index) override;
-
-private:
-    int doLayout(const QRect &rect, bool testOnly) const;
-    int smartSpacing(QStyle::PixelMetric pm) const;
-
-    QList<QLayoutItem *> m_itemList;
-    int m_hSpace;
-    int m_vSpace;
-};
-
 class TagWidget : public QWidget
 {
     Q_OBJECT
@@ -126,8 +96,9 @@ class TagWidget : public QWidget
 public:
     explicit TagWidget(QWidget *parent = nullptr);
     ~TagWidget();
-    
-    void updateData(const QList<TodoFolder> &folders);
+
+    void updateData(const QList<TodoFolder> &folders, const QStringList &allTags);
+    void refreshTheme();                       // 主题切换后重建样式表
     
 signals:
     void tagSelected(const QString &tag);
@@ -156,12 +127,14 @@ private:
     
     QWidget *m_cloudPanel;
     QVBoxLayout *m_cloudLayout;
+    QWidget *m_cloudHeader;
     QLabel *m_cloudTitle;
     QWidget *m_cloudContainer;
-    QFlowLayout *m_cloudFlow;
-    
+    FlowLayout *m_cloudFlow;
+
     QWidget *m_listPanel;
     QVBoxLayout *m_listLayout;
+    QWidget *m_listHeader;
     QLabel *m_listTitle;
     QScrollArea *m_tagScrollArea;
     QWidget *m_tagContainer;
@@ -174,6 +147,7 @@ private:
     
     QWidget *m_todoPanel;
     QVBoxLayout *m_todoLayout;
+    QWidget *m_todoHeader;
     QLabel *m_todoTitle;
     QLabel *m_selectedTagLabel;
     QScrollArea *m_todoScrollArea;
@@ -181,6 +155,7 @@ private:
     QVBoxLayout *m_todoListLayout;
     
     QList<TodoFolder> m_folders;
+    QStringList m_allTags;
     QString m_selectedTag;
     QMap<QString, int> m_tagCounts;
     QMap<QString, QList<TodoItem>> m_tagToTodos;

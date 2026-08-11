@@ -30,6 +30,7 @@ public:
     QStringList getTags() const { return m_tags; }
     QString getTagColor() const { return m_tagColor; }
     bool isPinned() const { return m_isPinned; }
+    QDateTime getRemindAt() const { return m_remindAt; }       // 无效值 = 不提醒
     
     void setTitle(const QString &title) { m_title = title; m_updatedTime = QDateTime::currentDateTime(); }
     void setDetails(const QString &details) { m_details = details; m_updatedTime = QDateTime::currentDateTime(); }
@@ -47,6 +48,7 @@ public:
     void setCreatedTime(const QDateTime &time) { m_createdTime = time; }
     void setCompletedTime(const QDateTime &time) { m_completedTime = time; }
     void setUpdatedTime(const QDateTime &time) { m_updatedTime = time; }
+    void setRemindAt(const QDateTime &time) { m_remindAt = time; }
     
     QJsonObject toJson() const;
     void fromJson(const QJsonObject &json);
@@ -69,6 +71,7 @@ private:
     QStringList m_tags;
     QString m_tagColor;
     bool m_isPinned;
+    QDateTime m_remindAt;   // 到期提醒时间；无效值表示不提醒
 };
 
 #endif // TODOITEM_H

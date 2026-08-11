@@ -65,6 +65,7 @@ QJsonObject TodoItem::toJson() const
     json["tags"] = QJsonArray::fromStringList(m_tags);
     json["tagColor"] = m_tagColor;
     json["isPinned"] = m_isPinned;
+    json["remindAt"] = m_remindAt.isValid() ? m_remindAt.toString(Qt::ISODate) : QString();
     return json;
 }
 
@@ -83,6 +84,7 @@ void TodoItem::fromJson(const QJsonObject &json)
     m_priority = json["priority"].toInt(0);
     m_tagColor = json["tagColor"].toString("#2563eb");
     m_isPinned = json["isPinned"].toBool(false);
+    m_remindAt = QDateTime::fromString(json["remindAt"].toString(), Qt::ISODate);
     
     QJsonArray tagsArray = json["tags"].toArray();
     m_tags.clear();

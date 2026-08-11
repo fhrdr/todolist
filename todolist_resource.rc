@@ -1,6 +1,6 @@
 #include <windows.h>
 
-IDI_ICON1	ICON	"F:\\ZZZ_GIT_Projects\\02 Todo List\\icons\\app.ico"
+IDI_ICON1	ICON	"resources\\icons\\app.ico"
 
 VS_VERSION_INFO VERSIONINFO
 	FILEVERSION 0,0,0,0

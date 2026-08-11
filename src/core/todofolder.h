@@ -19,6 +19,7 @@ public:
     QString getName() const { return m_name; }
     QDateTime getCreatedTime() const { return m_createdTime; }
     QList<TodoItem> getItems() const { return m_items; }
+    QList<TodoItem>& getItemsRef() { return m_items; }   // 可写引用：提醒扫描等就地修改场景使用
     int getItemCount() const { return m_items.size(); }
     int getCompletedCount() const;
     int getPendingCount() const;

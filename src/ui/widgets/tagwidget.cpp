@@ -1,13 +1,11 @@
 #include "tagwidget.h"
+#include "../theme.h"
 #include <QPainter>
 #include <QMouseEvent>
 #include <QFontMetrics>
 #include <QScrollBar>
 #include <QStyle>
 #include <QRandomGenerator>
-#include <QSqlDatabase>
-#include <QSqlQuery>
-#include <QUuid>
 
 namespace {
     QColor getRandomTagColor()
@@ -105,35 +103,35 @@ void TagListItem::paintEvent(QPaintEvent *event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     
-    painter.fillRect(rect(), QColor(255, 255, 255));
-    
+    painter.fillRect(rect(), Theme::surface());
+
     painter.setPen(Qt::NoPen);
     painter.setBrush(m_bgColor);
     painter.drawRoundedRect(16, 12, 4, height() - 24, 2, 2);
-    
+
     QFont tagFont;
     tagFont.setPixelSize(13);
     painter.setFont(tagFont);
-    painter.setPen(QColor(30, 41, 59));
+    painter.setPen(Theme::textPrimary());
     painter.drawText(QRect(28, 0, width() - 100, height()), Qt::AlignLeft | Qt::AlignVCenter, m_tag);
-    
+
     QFont countFont;
     countFont.setPixelSize(12);
     painter.setFont(countFont);
-    painter.setPen(QColor(100, 116, 139));
+    painter.setPen(Theme::textSecondary());
     QString countText = QString("（%1）").arg(m_count);
     painter.drawText(QRect(width() - 80, 0, 40, height()), Qt::AlignRight | Qt::AlignVCenter, countText);
-    
+
     int btnSize = 18;
     int rightPadding = 10;
     int btnLeft = width() - rightPadding - btnSize;
     int btnTop = (height() - btnSize) / 2 + 2;
     m_deleteRect = QRect(btnLeft, btnTop, btnSize, btnSize);
     painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(254, 226, 226));
+    painter.setBrush(Theme::withAlpha(Theme::danger(), Theme::isDark() ? 60 : 40));
     painter.drawRoundedRect(m_deleteRect, 9, 9);
-    
-    painter.setPen(QPen(QColor(239, 68, 68), 2));
+
+    painter.setPen(QPen(Theme::danger(), 2));
     int margin = 5;
     painter.drawLine(m_deleteRect.left() + margin, m_deleteRect.top() + margin, 
                      m_deleteRect.right() - margin, m_deleteRect.bottom() - margin);
@@ -188,31 +186,31 @@ void TodoItemWidget::paintEvent(QPaintEvent *event)
         if (!m_tagColor.isEmpty()) {
             QColor baseColor(m_tagColor);
             QColor lightColor = QColor(baseColor.red(), baseColor.green(), baseColor.blue(), 25);
-            QColor whiteColor = QColor(255, 255, 255, 255);
-            QLinearGradient gradient(contentRect.left(), contentRect.top(), 
+            QColor whiteColor = Theme::surface();
+            QLinearGradient gradient(contentRect.left(), contentRect.top(),
                                      contentRect.right(), contentRect.top());
             gradient.setColorAt(0, lightColor);
             gradient.setColorAt(1, whiteColor);
             painter.fillRect(contentRect, gradient);
         } else {
-            painter.fillRect(contentRect, QColor(252, 252, 253));
+            painter.fillRect(contentRect, Theme::surface());
         }
     } else if (!m_tagColor.isEmpty()) {
         QColor baseColor(m_tagColor);
         QColor lightColor = QColor(baseColor.red(), baseColor.green(), baseColor.blue(), 40);
-        QColor whiteColor = QColor(255, 255, 255, 255);
-        QLinearGradient gradient(contentRect.left(), contentRect.top(), 
+        QColor whiteColor = Theme::surface();
+        QLinearGradient gradient(contentRect.left(), contentRect.top(),
                                  contentRect.right(), contentRect.top());
         gradient.setColorAt(0, lightColor);
         gradient.setColorAt(1, whiteColor);
         painter.fillRect(contentRect, gradient);
     } else {
-        painter.fillRect(contentRect, QColor(255, 255, 255));
+        painter.fillRect(contentRect, Theme::surface());
     }
-    
-    QColor checkColor = m_completed ? QColor(180, 190, 200) : QColor(203, 213, 225);
-    QColor checkBg = QColor(255, 255, 255);
-    
+
+    QColor checkColor = m_completed ? Theme::textDisabled() : Theme::borderStrong();
+    QColor checkBg = Theme::surface();
+
     QRect checkRect(16, 14, 18, 18);
     painter.setPen(Qt::NoPen);
     painter.setBrush(checkBg);
@@ -220,21 +218,21 @@ void TodoItemWidget::paintEvent(QPaintEvent *event)
     painter.setPen(QPen(checkColor, 2));
     painter.setBrush(Qt::NoBrush);
     painter.drawRoundedRect(checkRect, 4, 4);
-    
+
     if (m_completed) {
         QPainterPath checkPath;
         checkPath.moveTo(checkRect.left() + 4, checkRect.center().y());
         checkPath.lineTo(checkRect.center().x(), checkRect.bottom() - 4);
         checkPath.lineTo(checkRect.right() - 4, checkRect.top() + 4);
-        painter.setPen(QPen(QColor(150, 160, 170), 2));
+        painter.setPen(QPen(Theme::textMuted(), 2));
         painter.drawPath(checkPath);
     }
-    
+
     QFont titleFont;
     titleFont.setPixelSize(15);
     titleFont.setBold(!m_completed);
     painter.setFont(titleFont);
-    painter.setPen(m_completed ? QColor(180, 185, 190) : QColor(30, 41, 59));
+    painter.setPen(m_completed ? Theme::textDisabled() : Theme::textPrimary());
     
     QFontMetrics fm(titleFont);
     QString elidedTitle = fm.elidedText(m_title, Qt::ElideRight, width() - 120);
@@ -243,7 +241,7 @@ void TodoItemWidget::paintEvent(QPaintEvent *event)
     QFont detailFont;
     detailFont.setPixelSize(11);
     painter.setFont(detailFont);
-    painter.setPen(QColor(148, 163, 184));
+    painter.setPen(Theme::textMuted());
     
     QFontMetrics detailFm(detailFont);
     QString detailText = m_details.isEmpty() ? QString::fromUtf8("还没有写任何内容呢~") : m_details;
@@ -254,7 +252,7 @@ void TodoItemWidget::paintEvent(QPaintEvent *event)
     QFont infoFont;
     infoFont.setPixelSize(10);
     painter.setFont(infoFont);
-    painter.setPen(QColor(100, 116, 139));
+    painter.setPen(Theme::textSecondary());
     
     QString infoText;
     if (m_dueDate.isValid()) {
@@ -300,133 +298,156 @@ void TagWidget::setupUI()
     leftLayout->setSpacing(16);
     
     m_cloudPanel = new QWidget();
-    m_cloudPanel->setStyleSheet("background-color: #ffffff; border: none;");
     m_cloudLayout = new QVBoxLayout(m_cloudPanel);
     m_cloudLayout->setContentsMargins(0, 0, 0, 0);
     m_cloudLayout->setSpacing(0);
-    
-    QWidget *cloudHeader = new QWidget();
-    cloudHeader->setStyleSheet("background-color: #ffffff; border-bottom: 1px solid #e2e8f0;");
-    cloudHeader->setFixedHeight(40);
-    QHBoxLayout *cloudHeaderLayout = new QHBoxLayout(cloudHeader);
+
+    m_cloudHeader = new QWidget();
+    m_cloudHeader->setFixedHeight(40);
+    QHBoxLayout *cloudHeaderLayout = new QHBoxLayout(m_cloudHeader);
     cloudHeaderLayout->setContentsMargins(20, 8, 20, 8);
-    
+
     m_cloudTitle = new QLabel("标签云");
-    m_cloudTitle->setStyleSheet("font-size: 14px; font-weight: 600; color: #1e293b; border: none;");
     cloudHeaderLayout->addWidget(m_cloudTitle);
-    m_cloudLayout->addWidget(cloudHeader);
-    
+    m_cloudLayout->addWidget(m_cloudHeader);
+
     m_cloudContainer = new QWidget();
     m_cloudContainer->setStyleSheet("background-color: transparent;");
-    m_cloudFlow = new QFlowLayout(m_cloudContainer, 8, 12, 12);
+    m_cloudFlow = new FlowLayout(m_cloudContainer, 8, 12, 12);
     m_cloudLayout->addWidget(m_cloudContainer);
-    
+
     leftLayout->addWidget(m_cloudPanel, 1);
-    
+
     m_listPanel = new QWidget();
-    m_listPanel->setStyleSheet("background-color: #ffffff; border: none;");
     m_listLayout = new QVBoxLayout(m_listPanel);
     m_listLayout->setContentsMargins(0, 0, 0, 0);
     m_listLayout->setSpacing(0);
-    
-    QWidget *listHeader = new QWidget();
-    listHeader->setStyleSheet("background-color: #ffffff; border-bottom: 1px solid #e2e8f0;");
-    listHeader->setFixedHeight(40);
-    QHBoxLayout *listHeaderLayout = new QHBoxLayout(listHeader);
+
+    m_listHeader = new QWidget();
+    m_listHeader->setFixedHeight(40);
+    QHBoxLayout *listHeaderLayout = new QHBoxLayout(m_listHeader);
     listHeaderLayout->setContentsMargins(20, 8, 20, 8);
-    
+
     m_listTitle = new QLabel("标签列表");
-    m_listTitle->setStyleSheet("font-size: 14px; font-weight: 600; color: #1e293b; border: none;");
     listHeaderLayout->addWidget(m_listTitle);
     listHeaderLayout->addStretch();
-    m_listLayout->addWidget(listHeader);
-    
+    m_listLayout->addWidget(m_listHeader);
+
     m_tagScrollArea = new QScrollArea();
     m_tagScrollArea->setWidgetResizable(true);
     m_tagScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_tagScrollArea->setStyleSheet("QScrollArea { border: none; background-color: transparent; }");
-    
+
     m_tagContainer = new QWidget();
     m_tagContainer->setStyleSheet("background-color: transparent;");
     m_tagListLayout = new QVBoxLayout(m_tagContainer);
     m_tagListLayout->setContentsMargins(12, 0, 12, 12);
     m_tagListLayout->setSpacing(4);
     m_tagListLayout->addStretch();
-    
+
     m_tagScrollArea->setWidget(m_tagContainer);
     m_listLayout->addWidget(m_tagScrollArea, 1);
-    
+
     m_addPanel = new QWidget();
-    m_addPanel->setStyleSheet("background-color: transparent; border-top: 1px solid #f1f5f9;");
     m_addLayout = new QHBoxLayout(m_addPanel);
     m_addLayout->setContentsMargins(16, 12, 16, 12);
     m_addLayout->setSpacing(8);
-    
+
     m_addLineEdit = new QLineEdit();
     m_addLineEdit->setPlaceholderText("新建标签...");
-    m_addLineEdit->setStyleSheet(
-        "QLineEdit { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; "
-        "padding: 8px 12px; color: #334155; font-size: 13px; }"
-        "QLineEdit:focus { border-color: #94a3b8; background-color: #ffffff; }"
-        "QLineEdit::placeholder { color: #94a3b8; }"
-    );
     m_addLayout->addWidget(m_addLineEdit, 1);
-    
-    QString btnStyle = 
-        "QPushButton { background-color: #ffffff; border: 2px solid #3b82f6; border-radius: 8px; "
-        "padding: 8px 16px; color: #3b82f6; font-size: 13px; font-weight: 500; }"
-        "QPushButton:hover { background-color: rgba(59, 130, 246, 0.1); }"
-        "QPushButton:pressed { background-color: rgba(59, 130, 246, 0.2); }";
-    
+
     m_addButton = new QPushButton("添加");
-    m_addButton->setStyleSheet(btnStyle);
     m_addLayout->addWidget(m_addButton);
-    
+
     m_listLayout->addWidget(m_addPanel);
-    
+
     leftLayout->addWidget(m_listPanel, 1);
-    
+
     m_mainLayout->addWidget(leftPanel, 1);
-    
+
     m_todoPanel = new QWidget();
-    m_todoPanel->setStyleSheet("background-color: #ffffff; border: none;");
     m_todoPanel->setMinimumWidth(400);
     QVBoxLayout *todoMainLayout = new QVBoxLayout(m_todoPanel);
     todoMainLayout->setContentsMargins(0, 0, 0, 0);
     todoMainLayout->setSpacing(0);
-    
-    QWidget *todoHeader = new QWidget();
-    todoHeader->setStyleSheet("background-color: #ffffff; border-bottom: 1px solid #e2e8f0;");
-    QVBoxLayout *todoHeaderLayout = new QVBoxLayout(todoHeader);
+
+    m_todoHeader = new QWidget();
+    QVBoxLayout *todoHeaderLayout = new QVBoxLayout(m_todoHeader);
     todoHeaderLayout->setContentsMargins(20, 16, 20, 12);
     todoHeaderLayout->setSpacing(6);
-    
+
     m_todoTitle = new QLabel("待办事项");
-    m_todoTitle->setStyleSheet("font-size: 14px; font-weight: 600; color: #1e293b; border: none;");
     todoHeaderLayout->addWidget(m_todoTitle);
-    
+
     m_selectedTagLabel = new QLabel("选择一个标签查看相关待办事项");
-    m_selectedTagLabel->setStyleSheet("font-size: 12px; color: #64748b; border: none;");
     todoHeaderLayout->addWidget(m_selectedTagLabel);
-    
-    todoMainLayout->addWidget(todoHeader);
-    
+
+    todoMainLayout->addWidget(m_todoHeader);
+
     m_todoScrollArea = new QScrollArea();
     m_todoScrollArea->setWidgetResizable(true);
     m_todoScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_todoScrollArea->setStyleSheet("QScrollArea { border: none; background-color: transparent; }");
-    
+
     m_todoContainer = new QWidget();
     m_todoContainer->setStyleSheet("background-color: transparent;");
     m_todoListLayout = new QVBoxLayout(m_todoContainer);
     m_todoListLayout->setContentsMargins(12, 12, 12, 12);
     m_todoListLayout->setSpacing(6);
     m_todoListLayout->addStretch();
-    
+
     m_todoScrollArea->setWidget(m_todoContainer);
     todoMainLayout->addWidget(m_todoScrollArea, 1);
-    
+
     m_mainLayout->addWidget(m_todoPanel, 2);
+
+    refreshTheme();
+}
+
+void TagWidget::refreshTheme()
+{
+    const QString panelStyle = QStringLiteral("background-color: %1; border: none;")
+                               .arg(Theme::surface().name());
+    const QString headerStyle = QStringLiteral("background-color: %1; border-bottom: 1px solid %2;")
+                                .arg(Theme::surface().name(), Theme::border().name());
+    const QString titleStyle = QStringLiteral("font-size: 14px; font-weight: 600; color: %1; border: none;")
+                               .arg(Theme::textPrimary().name());
+
+    m_cloudPanel->setStyleSheet(panelStyle);
+    m_cloudHeader->setStyleSheet(headerStyle);
+    m_cloudTitle->setStyleSheet(titleStyle);
+
+    m_listPanel->setStyleSheet(panelStyle);
+    m_listHeader->setStyleSheet(headerStyle);
+    m_listTitle->setStyleSheet(titleStyle);
+
+    m_todoPanel->setStyleSheet(panelStyle);
+    m_todoHeader->setStyleSheet(headerStyle);
+    m_todoTitle->setStyleSheet(titleStyle);
+
+    m_selectedTagLabel->setStyleSheet(QStringLiteral("font-size: 12px; color: %1; border: none;")
+                                      .arg(Theme::textSecondary().name()));
+
+    m_addPanel->setStyleSheet(QStringLiteral("background-color: transparent; border-top: 1px solid %1;")
+                              .arg(Theme::border().name()));
+
+    m_addLineEdit->setStyleSheet(QStringLiteral(
+        "QLineEdit { background-color: %1; border: 1px solid %2; border-radius: 8px; "
+        "padding: 8px 12px; color: %3; font-size: 13px; }"
+        "QLineEdit:focus { border-color: %4; background-color: %5; }"
+        "QLineEdit::placeholder { color: %6; }")
+        .arg(Theme::surfaceAlt().name(), Theme::border().name(), Theme::textPrimary().name(),
+             Theme::textMuted().name(), Theme::surface().name(), Theme::textMuted().name()));
+
+    m_addButton->setStyleSheet(QStringLiteral(
+        "QPushButton { background-color: %1; border: 2px solid %2; border-radius: 8px; "
+        "padding: 8px 16px; color: %2; font-size: 13px; font-weight: 500; }"
+        "QPushButton:hover { background-color: %3; }"
+        "QPushButton:pressed { background-color: %4; }")
+        .arg(Theme::surface().name(), Theme::primary().name(),
+             Theme::withAlpha(Theme::primary(), 25).name(QColor::HexArgb),
+             Theme::withAlpha(Theme::primary(), 50).name(QColor::HexArgb)));
 }
 
 void TagWidget::setupConnections()
@@ -434,9 +455,10 @@ void TagWidget::setupConnections()
     connect(m_addButton, &QPushButton::clicked, this, &TagWidget::onAddTag);
 }
 
-void TagWidget::updateData(const QList<TodoFolder> &folders)
+void TagWidget::updateData(const QList<TodoFolder> &folders, const QStringList &allTags)
 {
     m_folders = folders;
+    m_allTags = allTags;
     collectAllTags();
     refreshTagCloud();
     refreshTagList();
@@ -448,14 +470,12 @@ void TagWidget::collectAllTags()
     m_tagCounts.clear();
     m_tagToTodos.clear();
     m_todoToFolder.clear();
-    
-    QSqlQuery query;
-    if (query.exec("SELECT name FROM tags")) {
-        while (query.next()) {
-            QString tagName = query.value(0).toString();
-            if (!m_tagCounts.contains(tagName)) {
-                m_tagCounts[tagName] = 0;
-            }
+
+    // 标签库（含尚未关联任何事项的标签）由调用方统一从 DatabaseManager 提供，
+    // 本组件不再直接访问数据库，保证数据访问入口唯一。
+    for (const QString &tagName : m_allTags) {
+        if (!m_tagCounts.contains(tagName)) {
+            m_tagCounts[tagName] = 0;
         }
     }
     
@@ -562,11 +582,7 @@ void TagWidget::onTagListClicked(const QString &tag)
 
 void TagWidget::onTagDeleteRequested(const QString &tag)
 {
-    QSqlQuery query;
-    query.prepare("DELETE FROM tags WHERE name = ?");
-    query.addBindValue(tag);
-    query.exec();
-    
+    // 只发信号：实际删除由 MainWindow 经 DatabaseManager 在事务中级联完成
     emit tagDeleted(tag);
 }
 
@@ -586,151 +602,5 @@ void TagWidget::onAddTag()
     if (!tag.isEmpty()) {
         emit tagCreated(tag);
         m_addLineEdit->clear();
-    }
-}
-
-QFlowLayout::QFlowLayout(QWidget *parent, int margin, int hSpacing, int vSpacing)
-    : QLayout(parent), m_hSpace(hSpacing), m_vSpace(vSpacing)
-{
-    setContentsMargins(margin, margin, margin, margin);
-}
-
-QFlowLayout::QFlowLayout(int margin, int hSpacing, int vSpacing)
-    : m_hSpace(hSpacing), m_vSpace(vSpacing)
-{
-    setContentsMargins(margin, margin, margin, margin);
-}
-
-QFlowLayout::~QFlowLayout()
-{
-    QLayoutItem *item;
-    while ((item = takeAt(0)))
-        delete item;
-}
-
-void QFlowLayout::addItem(QLayoutItem *item)
-{
-    m_itemList.append(item);
-}
-
-int QFlowLayout::horizontalSpacing() const
-{
-    if (m_hSpace >= 0) {
-        return m_hSpace;
-    } else {
-        return smartSpacing(QStyle::PM_LayoutHorizontalSpacing);
-    }
-}
-
-int QFlowLayout::verticalSpacing() const
-{
-    if (m_vSpace >= 0) {
-        return m_vSpace;
-    } else {
-        return smartSpacing(QStyle::PM_LayoutVerticalSpacing);
-    }
-}
-
-int QFlowLayout::count() const
-{
-    return m_itemList.size();
-}
-
-QLayoutItem *QFlowLayout::itemAt(int index) const
-{
-    return m_itemList.value(index);
-}
-
-QLayoutItem *QFlowLayout::takeAt(int index)
-{
-    if (index >= 0 && index < m_itemList.size())
-        return m_itemList.takeAt(index);
-    return nullptr;
-}
-
-Qt::Orientations QFlowLayout::expandingDirections() const
-{
-    return {};
-}
-
-bool QFlowLayout::hasHeightForWidth() const
-{
-    return true;
-}
-
-int QFlowLayout::heightForWidth(int width) const
-{
-    int height = doLayout(QRect(0, 0, width, 0), true);
-    return height;
-}
-
-void QFlowLayout::setGeometry(const QRect &rect)
-{
-    QLayout::setGeometry(rect);
-    doLayout(rect, false);
-}
-
-QSize QFlowLayout::sizeHint() const
-{
-    return minimumSize();
-}
-
-QSize QFlowLayout::minimumSize() const
-{
-    QSize size;
-    for (const QLayoutItem *item : std::as_const(m_itemList))
-        size = size.expandedTo(item->minimumSize());
-    
-    const QMargins margins = contentsMargins();
-    size += QSize(margins.left() + margins.right(), margins.top() + margins.bottom());
-    return size;
-}
-
-int QFlowLayout::doLayout(const QRect &rect, bool testOnly) const
-{
-    int left, top, right, bottom;
-    getContentsMargins(&left, &top, &right, &bottom);
-    QRect effectiveRect = rect.adjusted(+left, +top, -right, -bottom);
-    int x = effectiveRect.x();
-    int y = effectiveRect.y();
-    int lineHeight = 0;
-    
-    for (QLayoutItem *item : std::as_const(m_itemList)) {
-        const QWidget *wid = item->widget();
-        int spaceX = horizontalSpacing();
-        if (spaceX == -1)
-            spaceX = wid->style()->layoutSpacing(QSizePolicy::PushButton, QSizePolicy::PushButton, Qt::Horizontal);
-        int spaceY = verticalSpacing();
-        if (spaceY == -1)
-            spaceY = wid->style()->layoutSpacing(QSizePolicy::PushButton, QSizePolicy::PushButton, Qt::Vertical);
-        
-        int nextX = x + item->sizeHint().width() + spaceX;
-        if (nextX - spaceX > effectiveRect.right() && lineHeight > 0) {
-            x = effectiveRect.x();
-            y = y + lineHeight + spaceY;
-            nextX = x + item->sizeHint().width() + spaceX;
-            lineHeight = 0;
-        }
-        
-        if (!testOnly)
-            item->setGeometry(QRect(QPoint(x, y), item->sizeHint()));
-        
-        x = nextX;
-        lineHeight = qMax(lineHeight, item->sizeHint().height());
-    }
-    
-    return y + lineHeight - rect.y() + bottom;
-}
-
-int QFlowLayout::smartSpacing(QStyle::PixelMetric pm) const
-{
-    QObject *parent = this->parent();
-    if (!parent) {
-        return -1;
-    } else if (parent->isWidgetType()) {
-        QWidget *pw = static_cast<QWidget *>(parent);
-        return pw->style()->pixelMetric(pm, nullptr, pw);
-    } else {
-        return static_cast<QLayout *>(parent)->spacing();
     }
 }

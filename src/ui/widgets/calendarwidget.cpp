@@ -1,4 +1,5 @@
 #include "calendarwidget.h"
+#include "../theme.h"
 #include <QPainter>
 #include <QMouseEvent>
 #include <QFontMetrics>
@@ -68,34 +69,34 @@ void CalendarCell::paintEvent(QPaintEvent *event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     
-    QColor bgColor = m_selected ? QColor(239, 246, 255) : QColor(255, 255, 255);
+    QColor bgColor = m_selected ? Theme::primarySoft() : Theme::surface();
     if (m_otherMonth) {
-        bgColor = QColor(249, 250, 251);
+        bgColor = Theme::background();
     }
     painter.fillRect(rect(), bgColor);
-    
+
     if (m_selected) {
-        painter.setPen(QPen(QColor(37, 99, 235), 2));
+        painter.setPen(QPen(Theme::primaryHover(), 2));
         painter.setBrush(Qt::NoBrush);
         painter.drawRoundedRect(rect().adjusted(1, 1, -1, -1), 6, 6);
     }
-    
+
     QFont dateFont;
     dateFont.setPixelSize(12);
     dateFont.setBold(m_today);
     painter.setFont(dateFont);
-    
-    QColor dateColor = m_otherMonth ? QColor(156, 163, 175) : 
-                       m_today ? QColor(37, 99, 235) : QColor(55, 65, 81);
+
+    QColor dateColor = m_otherMonth ? Theme::textMuted() :
+                       m_today ? Theme::primaryHover() : Theme::textPrimary();
     painter.setPen(dateColor);
-    
+
     QRect dateRect = getDateRect();
     painter.drawText(dateRect, Qt::AlignCenter, QString::number(m_date.day()));
-    
+
     QList<QColor> priorityColors = {
-        QColor(59, 130, 246),
-        QColor(245, 158, 11),
-        QColor(239, 68, 68)
+        Theme::primary(),
+        Theme::warning(),
+        Theme::danger()
     };
     
     int maxTodos = qMin(3, m_todos.size());
@@ -111,7 +112,7 @@ void CalendarCell::paintEvent(QPaintEvent *event)
                 QColor baseColor(todo.getTagColor());
                 tagColor = QColor(baseColor.red(), baseColor.green(), baseColor.blue(), 60);
             } else {
-                tagColor = QColor(200, 205, 210, 120);
+                tagColor = Theme::withAlpha(Theme::textDisabled(), 120);
             }
         } else if (!todo.getTagColor().isEmpty()) {
             QColor baseColor(todo.getTagColor());
@@ -129,7 +130,7 @@ void CalendarCell::paintEvent(QPaintEvent *event)
         QFont todoFont;
         todoFont.setPixelSize(10);
         painter.setFont(todoFont);
-        QColor textColor = todo.isCompleted() ? QColor(120, 125, 130) : QColor(50, 55, 60);
+        QColor textColor = todo.isCompleted() ? Theme::textMuted() : Theme::textPrimary();
         painter.setPen(textColor);
         
         QFontMetrics fm(todoFont);
@@ -141,7 +142,7 @@ void CalendarCell::paintEvent(QPaintEvent *event)
         QFont moreFont;
         moreFont.setPixelSize(9);
         painter.setFont(moreFont);
-        painter.setPen(QColor(107, 114, 128));
+        painter.setPen(Theme::textSecondary());
         QString moreText = QString("+%1").arg(m_todos.size() - 3);
         QRect moreRect = getTodoRect(3);
         if (!moreRect.isEmpty()) {
@@ -199,59 +200,47 @@ void CalendarGrid::setupUI()
     m_headerLayout = new QHBoxLayout(m_headerWidget);
     m_headerLayout->setContentsMargins(0, 0, 0, 0);
     m_headerLayout->setSpacing(4);
-    
-    QString btnStyle = 
-        "QPushButton { background-color: #dbeafe; border: none; border-radius: 6px; "
-        "color: #1e40af; font-size: 12px; font-weight: bold; }"
-        "QPushButton:hover { background-color: #bfdbfe; }"
-        "QPushButton:pressed { background-color: #93c5fd; }";
-    
+
     m_prevYearBtn = new QPushButton("<<");
     m_prevYearBtn->setFixedSize(36, 32);
     m_prevYearBtn->setCursor(Qt::PointingHandCursor);
     m_prevYearBtn->setToolTip("上一年");
-    m_prevYearBtn->setStyleSheet(btnStyle);
     m_headerLayout->addWidget(m_prevYearBtn);
-    
+
     m_prevBtn = new QPushButton("<");
     m_prevBtn->setFixedSize(36, 32);
     m_prevBtn->setCursor(Qt::PointingHandCursor);
     m_prevBtn->setToolTip("上一月");
-    m_prevBtn->setStyleSheet(btnStyle);
     m_headerLayout->addWidget(m_prevBtn);
-    
+
     m_monthLabel = new QLabel();
-    m_monthLabel->setStyleSheet("color: #1f2937; font-size: 16px; font-weight: 600;");
     m_monthLabel->setAlignment(Qt::AlignCenter);
     m_headerLayout->addWidget(m_monthLabel, 1);
-    
+
     m_nextBtn = new QPushButton(">");
     m_nextBtn->setFixedSize(36, 32);
     m_nextBtn->setCursor(Qt::PointingHandCursor);
     m_nextBtn->setToolTip("下一月");
-    m_nextBtn->setStyleSheet(btnStyle);
     m_headerLayout->addWidget(m_nextBtn);
-    
+
     m_nextYearBtn = new QPushButton(">>");
     m_nextYearBtn->setFixedSize(36, 32);
     m_nextYearBtn->setCursor(Qt::PointingHandCursor);
     m_nextYearBtn->setToolTip("下一年");
-    m_nextYearBtn->setStyleSheet(btnStyle);
     m_headerLayout->addWidget(m_nextYearBtn);
-    
+
     m_mainLayout->addWidget(m_headerWidget);
-    
+
     m_weekHeader = new QWidget();
-    m_weekHeader->setStyleSheet("background-color: #f1f5f9; border-radius: 6px;");
     m_weekHeaderLayout = new QHBoxLayout(m_weekHeader);
     m_weekHeaderLayout->setContentsMargins(4, 8, 4, 8);
     m_weekHeaderLayout->setSpacing(2);
-    
+
     QStringList weekDays = {"一", "二", "三", "四", "五", "六", "日"};
     for (const QString &day : weekDays) {
         QLabel *label = new QLabel(day);
         label->setAlignment(Qt::AlignCenter);
-        label->setStyleSheet("color: #64748b; font-size: 12px; font-weight: 600;");
+        label->setProperty("weekDayLabel", true);
         m_weekHeaderLayout->addWidget(label);
     }
     m_mainLayout->addWidget(m_weekHeader);
@@ -280,8 +269,38 @@ void CalendarGrid::setupUI()
     connect(m_nextBtn, &QPushButton::clicked, this, &CalendarGrid::onNextMonth);
     connect(m_prevYearBtn, &QPushButton::clicked, this, &CalendarGrid::onPrevYear);
     connect(m_nextYearBtn, &QPushButton::clicked, this, &CalendarGrid::onNextYear);
-    
+
+    refreshTheme();
     updateCells();
+}
+
+void CalendarGrid::refreshTheme()
+{
+    const QString btnStyle = QStringLiteral(
+        "QPushButton { background-color: %1; border: none; border-radius: 6px; "
+        "color: %2; font-size: 12px; font-weight: bold; }"
+        "QPushButton:hover { background-color: %3; }"
+        "QPushButton:pressed { background-color: %4; }")
+        .arg(Theme::primarySoft2().name(), Theme::primaryHover().name(),
+             Theme::withAlpha(Theme::primary(), 60).name(QColor::HexArgb),
+             Theme::withAlpha(Theme::primary(), 90).name(QColor::HexArgb));
+
+    for (QPushButton *btn : {m_prevYearBtn, m_prevBtn, m_nextBtn, m_nextYearBtn}) {
+        btn->setStyleSheet(btnStyle);
+    }
+
+    m_monthLabel->setStyleSheet(QStringLiteral("color: %1; font-size: 16px; font-weight: 600;")
+                                .arg(Theme::textPrimary().name()));
+    m_weekHeader->setStyleSheet(QStringLiteral("background-color: %1; border-radius: 6px;")
+                                .arg(Theme::surfaceAlt().name()));
+
+    const QString dayStyle = QStringLiteral("color: %1; font-size: 12px; font-weight: 600;")
+                             .arg(Theme::textSecondary().name());
+    for (QLabel *label : m_weekHeader->findChildren<QLabel*>()) {
+        if (label->property("weekDayLabel").toBool()) {
+            label->setStyleSheet(dayStyle);
+        }
+    }
 }
 
 bool CalendarGrid::eventFilter(QObject *watched, QEvent *event)
@@ -418,8 +437,8 @@ void TodoListItem::paintEvent(QPaintEvent *event)
         if (!m_tagColor.isEmpty()) {
             QColor baseColor(m_tagColor);
             QColor lightColor = QColor(baseColor.red(), baseColor.green(), baseColor.blue(), 25);
-            QColor whiteColor = QColor(255, 255, 255, 255);
-            QLinearGradient gradient(contentRect.left(), contentRect.top(), 
+            QColor whiteColor = Theme::surface();
+            QLinearGradient gradient(contentRect.left(), contentRect.top(),
                                      contentRect.right(), contentRect.top());
             gradient.setColorAt(0, lightColor);
             gradient.setColorAt(1, whiteColor);
@@ -428,15 +447,15 @@ void TodoListItem::paintEvent(QPaintEvent *event)
             painter.drawRoundedRect(contentRect, 6, 6);
         } else {
             painter.setPen(Qt::NoPen);
-            painter.setBrush(QColor(252, 252, 253));
+            painter.setBrush(Theme::surface());
             painter.drawRoundedRect(contentRect, 6, 6);
         }
     } else {
         if (!m_tagColor.isEmpty()) {
             QColor baseColor(m_tagColor);
             QColor lightColor = QColor(baseColor.red(), baseColor.green(), baseColor.blue(), 40);
-            QColor whiteColor = QColor(255, 255, 255, 255);
-            QLinearGradient gradient(contentRect.left(), contentRect.top(), 
+            QColor whiteColor = Theme::surface();
+            QLinearGradient gradient(contentRect.left(), contentRect.top(),
                                      contentRect.right(), contentRect.top());
             gradient.setColorAt(0, lightColor);
             gradient.setColorAt(1, whiteColor);
@@ -444,20 +463,20 @@ void TodoListItem::paintEvent(QPaintEvent *event)
             painter.setBrush(gradient);
             painter.drawRoundedRect(contentRect, 6, 6);
         } else {
-            QColor bgColor = m_selected ? QColor(239, 246, 255) : QColor(255, 255, 255);
+            QColor bgColor = m_selected ? Theme::primarySoft() : Theme::surface();
             painter.setPen(Qt::NoPen);
             painter.setBrush(bgColor);
             painter.drawRoundedRect(contentRect, 6, 6);
         }
     }
-    
+
     if (m_selected) {
-        painter.setPen(QPen(QColor(148, 163, 184), 1));
+        painter.setPen(QPen(Theme::borderStrong(), 1));
         painter.setBrush(Qt::NoBrush);
         painter.drawRoundedRect(contentRect, 6, 6);
     }
-    
-    QColor tagColor = QColor(148, 163, 184);
+
+    QColor tagColor = Theme::borderStrong();
     if (!m_tagColor.isEmpty()) {
         tagColor = QColor(m_tagColor);
         if (m_completed) {
@@ -465,17 +484,17 @@ void TodoListItem::paintEvent(QPaintEvent *event)
         }
     }
     if (m_completed && m_tagColor.isEmpty()) {
-        tagColor = QColor(200, 205, 210);
+        tagColor = Theme::textDisabled();
     }
     painter.setBrush(tagColor);
     painter.setPen(Qt::NoPen);
     painter.drawRoundedRect(12, 10, 4, height() - 20, 2, 2);
-    
+
     QFont titleFont;
     titleFont.setPixelSize(13);
     titleFont.setBold(!m_completed);
     painter.setFont(titleFont);
-    painter.setPen(m_completed ? QColor(180, 185, 190) : QColor(31, 41, 55));
+    painter.setPen(m_completed ? Theme::textDisabled() : Theme::textPrimary());
     
     QFontMetrics fm(titleFont);
     QString elidedTitle = fm.elidedText(m_title, Qt::ElideRight, width() - 24);
@@ -514,104 +533,132 @@ void CalendarWidget::setupUI()
     m_rightLayout = new QVBoxLayout(m_rightPanel);
     m_rightLayout->setContentsMargins(0, 0, 0, 0);
     m_rightLayout->setSpacing(12);
-    
-    m_rightPanel->setStyleSheet("background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;");
+
     m_rightPanel->setMinimumWidth(280);
     m_rightPanel->setMaximumWidth(320);
-    
+
     QWidget *headerWidget = new QWidget();
     headerWidget->setStyleSheet("background-color: transparent;");
     QVBoxLayout *headerLayout = new QVBoxLayout(headerWidget);
     headerLayout->setContentsMargins(20, 16, 20, 12);
     headerLayout->setSpacing(6);
-    
+
     m_dateLabel = new QLabel();
-    m_dateLabel->setStyleSheet("font-size: 14px; font-weight: 600; color: #1e293b; border: none;");
     headerLayout->addWidget(m_dateLabel);
-    
+
     m_countLabel = new QLabel();
-    m_countLabel->setStyleSheet("font-size: 12px; color: #64748b; border: none;");
     headerLayout->addWidget(m_countLabel);
-    
+
     m_rightLayout->addWidget(headerWidget);
-    
+
     m_todoScrollArea = new QScrollArea();
     m_todoScrollArea->setWidgetResizable(true);
     m_todoScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_todoScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     m_todoScrollArea->setStyleSheet("QScrollArea { border: none; background-color: transparent; }");
-    
+
     m_todoContainer = new QWidget();
     m_todoContainer->setStyleSheet("background-color: transparent;");
     m_todoListLayout = new QVBoxLayout(m_todoContainer);
     m_todoListLayout->setContentsMargins(12, 12, 12, 12);
     m_todoListLayout->setSpacing(6);
     m_todoListLayout->addStretch();
-    
+
     m_todoScrollArea->setWidget(m_todoContainer);
     m_rightLayout->addWidget(m_todoScrollArea, 1);
-    
+
     m_addPanel = new QWidget();
-    m_addPanel->setStyleSheet("background-color: transparent; border-top: 1px solid #f1f5f9;");
     m_addLayout = new QHBoxLayout(m_addPanel);
     m_addLayout->setContentsMargins(16, 12, 16, 12);
     m_addLayout->setSpacing(8);
-    
+
     m_addLineEdit = new QLineEdit();
     m_addLineEdit->setPlaceholderText("添加待办事项...");
-    m_addLineEdit->setStyleSheet(
-        "QLineEdit { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; "
-        "padding: 8px 12px; color: #334155; font-size: 13px; }"
-        "QLineEdit:focus { border-color: #94a3b8; background-color: #ffffff; }"
-        "QLineEdit::placeholder { color: #94a3b8; }"
-    );
     m_addLayout->addWidget(m_addLineEdit, 1);
-    
-    QString btnStyle = 
-        "QPushButton { background-color: #ffffff; border: 2px solid #22c55e; border-radius: 8px; "
-        "padding: 8px 16px; color: #22c55e; font-size: 13px; font-weight: 500; }"
-        "QPushButton:hover { background-color: rgba(34, 197, 94, 0.1); }"
-        "QPushButton:pressed { background-color: rgba(34, 197, 94, 0.2); }";
-    
+
     m_addButton = new QPushButton("添加");
-    m_addButton->setStyleSheet(btnStyle);
     m_addLayout->addWidget(m_addButton);
-    
+
     m_rightLayout->addWidget(m_addPanel);
-    
+
     QWidget *buttonPanel = new QWidget();
     buttonPanel->setStyleSheet("background-color: transparent;");
     QHBoxLayout *buttonLayout = new QHBoxLayout(buttonPanel);
     buttonLayout->setContentsMargins(16, 0, 16, 16);
     buttonLayout->setSpacing(8);
-    
+
     m_toggleButton = new QPushButton("完成");
-    m_toggleButton->setStyleSheet(
-        "QPushButton { background-color: #ffffff; border: 2px solid #3b82f6; border-radius: 8px; "
-        "padding: 8px 16px; color: #3b82f6; font-size: 13px; font-weight: 500; }"
-        "QPushButton:hover { background-color: rgba(59, 130, 246, 0.1); }"
-        "QPushButton:pressed { background-color: rgba(59, 130, 246, 0.2); }"
-        "QPushButton:disabled { background-color: #ffffff; color: #94a3b8; border-color: #e2e8f0; }"
-    );
     m_toggleButton->setEnabled(false);
     buttonLayout->addWidget(m_toggleButton);
-    
+
     m_deleteButton = new QPushButton("删除");
-    m_deleteButton->setStyleSheet(
-        "QPushButton { background-color: #ffffff; border: 2px solid #f59e0b; border-radius: 8px; "
-        "padding: 8px 16px; color: #f59e0b; font-size: 13px; font-weight: 500; }"
-        "QPushButton:hover { background-color: rgba(245, 158, 11, 0.1); }"
-        "QPushButton:pressed { background-color: rgba(245, 158, 11, 0.2); }"
-        "QPushButton:disabled { background-color: #ffffff; color: #94a3b8; border-color: #e2e8f0; }"
-    );
     m_deleteButton->setEnabled(false);
     buttonLayout->addWidget(m_deleteButton);
-    
+
     m_rightLayout->addWidget(buttonPanel);
-    
+
     m_mainLayout->addWidget(m_rightPanel);
-    
+
+    refreshTheme();
     updateDateLabel();
+}
+
+void CalendarWidget::refreshTheme()
+{
+    m_rightPanel->setStyleSheet(QStringLiteral(
+        "background-color: %1; border: 1px solid %2; border-radius: 12px;")
+        .arg(Theme::surface().name(), Theme::border().name()));
+
+    m_dateLabel->setStyleSheet(QStringLiteral(
+        "font-size: 14px; font-weight: 600; color: %1; border: none;")
+        .arg(Theme::textPrimary().name()));
+    m_countLabel->setStyleSheet(QStringLiteral(
+        "font-size: 12px; color: %1; border: none;")
+        .arg(Theme::textSecondary().name()));
+
+    m_addPanel->setStyleSheet(QStringLiteral(
+        "background-color: transparent; border-top: 1px solid %1;")
+        .arg(Theme::border().name()));
+
+    m_addLineEdit->setStyleSheet(QStringLiteral(
+        "QLineEdit { background-color: %1; border: 1px solid %2; border-radius: 8px; "
+        "padding: 8px 12px; color: %3; font-size: 13px; }"
+        "QLineEdit:focus { border-color: %4; background-color: %5; }"
+        "QLineEdit::placeholder { color: %6; }")
+        .arg(Theme::surfaceAlt().name(), Theme::border().name(), Theme::textPrimary().name(),
+             Theme::textMuted().name(), Theme::surface().name(), Theme::textMuted().name()));
+
+    // 彩色描边按钮：颜色语义固定（绿=添加 蓝=完成 橙=删除），仅背景/禁用态随主题
+    const QString outlineBtn = QStringLiteral(
+        "QPushButton { background-color: %1; border: 2px solid %2; border-radius: 8px; "
+        "padding: 8px 16px; color: %2; font-size: 13px; font-weight: 500; }"
+        "QPushButton:hover { background-color: %3; }"
+        "QPushButton:pressed { background-color: %4; }");
+    const QString disabledSuffix = QStringLiteral(
+        "QPushButton:disabled { background-color: %1; color: %2; border-color: %3; }")
+        .arg(Theme::surface().name(), Theme::textMuted().name(), Theme::border().name());
+
+    const QString green  = Theme::isDark() ? QStringLiteral("#4ade80") : QStringLiteral("#22c55e");
+    const QString blue   = Theme::primary().name();
+    const QString orange = Theme::warning().name();
+
+    m_addButton->setStyleSheet(outlineBtn
+        .arg(Theme::surface().name(), green,
+             QStringLiteral("rgba(74, 222, 128, 0.12)"), QStringLiteral("rgba(74, 222, 128, 0.24)")));
+    m_toggleButton->setStyleSheet(outlineBtn
+        .arg(Theme::surface().name(), blue,
+             Theme::withAlpha(Theme::primary(), 25).name(QColor::HexArgb),
+             Theme::withAlpha(Theme::primary(), 50).name(QColor::HexArgb))
+        + disabledSuffix);
+    m_deleteButton->setStyleSheet(outlineBtn
+        .arg(Theme::surface().name(), orange,
+             Theme::withAlpha(Theme::warning(), 25).name(QColor::HexArgb),
+             Theme::withAlpha(Theme::warning(), 50).name(QColor::HexArgb))
+        + disabledSuffix);
+
+    // 网格头部与单元格自绘色一并刷新
+    m_calendarGrid->refreshTheme();
+    m_calendarGrid->update();
 }
 
 void CalendarWidget::setupConnections()

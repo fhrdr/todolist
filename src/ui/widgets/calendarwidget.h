@@ -61,6 +61,7 @@ public:
     void setCurrentMonth(int year, int month);
     void setTodoData(const QMap<QDate, QList<TodoItem>> &todos);
     void setSelectedDate(const QDate &date);
+    void refreshTheme();                       // 主题切换后重建样式表
     QDate getSelectedDate() const { return m_selectedDate; }
     int getYear() const { return m_year; }
     int getMonth() const { return m_month; }
@@ -138,6 +139,7 @@ public:
     ~CalendarWidget();
     
     void updateTodoData(const QList<TodoFolder> &folders);
+    void refreshTheme();                       // 主题切换后重建样式表
     
 signals:
     void todoItemAdded(const QString &title, const QDate &date);
