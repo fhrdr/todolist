@@ -33,11 +33,13 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QMenu>
+#include <QActionGroup>
 #include <QTimer>
 #include <QApplication>
 #include <QStyle>
 #include <QDesktopServices>
 #include <QUrl>
+#include <QWheelEvent>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QDragMoveEvent>
@@ -244,18 +246,32 @@ public:
         if (selected) {
             bg = Theme::withAlpha(Theme::primary(), Theme::isDark() ? 34 : 26);
         } else if (hover > 0.0) {
-            const QColor h = Theme::hoverGlow();
-            const QColor base = Theme::glassBg();
-            bg = Theme::mix(base, h, hover);
+            if (Theme::isDark()) {
+                // 深色：玻璃底混入霓虹光晕
+                bg = Theme::mix(Theme::glassBg(), Theme::hoverGlow(), hover);
+            } else {
+                // 浅色：更实的白底 + 淡主题色晕染（避免发灰发脏）
+                bg = Theme::mix(Theme::glassBgStrong(), Theme::withAlpha(Theme::primary(), 22), hover);
+            }
         }
         painter->setPen(Qt::NoPen);
         painter->setBrush(bg);
         painter->drawRoundedRect(card, Theme::radiusMd, Theme::radiusMd);
 
-        // 玻璃高光描边（悬停/选中更亮）
+        // 玻璃高光描边（悬停/选中更亮；浅色模式悬停用主题色描边，白底高光不可见）
         painter->setBrush(Qt::NoBrush);
-        const int borderAlpha = selected ? 80 : (hover > 0.0 ? static_cast<int>(26 + 44 * hover) : 22);
-        painter->setPen(QPen(Theme::withAlpha(selected ? Theme::primary() : Theme::glassHighlight(), borderAlpha), 1));
+        QColor edge;
+        if (selected) {
+            edge = Theme::withAlpha(Theme::primary(), 80);
+        } else if (hover > 0.0) {
+            edge = Theme::isDark()
+                ? Theme::withAlpha(Theme::glassHighlight(), static_cast<int>(26 + 44 * hover))
+                : Theme::withAlpha(Theme::primary(), static_cast<int>(30 + 62 * hover));
+        } else {
+            edge = Theme::isDark() ? Theme::withAlpha(Theme::glassHighlight(), 22)
+                                   : Theme::withAlpha(Theme::glassBorder(), 140);
+        }
+        painter->setPen(QPen(edge, 1));
         painter->drawRoundedRect(card.adjusted(0, 0, -1, -1), Theme::radiusMd, Theme::radiusMd);
 
         // 标签色条（卡片左缘，带发光）
@@ -352,6 +368,16 @@ public:
     {
         return QSize(240, 64);
     }
+};
+
+// 滚轮不切换选项的组合框：防止在详情面板上滚动鼠标时误改优先级/标签颜色
+class NoWheelComboBox : public QComboBox
+{
+public:
+    using QComboBox::QComboBox;
+
+protected:
+    void wheelEvent(QWheelEvent *event) override { event->ignore(); }
 };
 
 } // namespace
@@ -452,6 +478,11 @@ void MainWindow::buildUi()
 {
     // 极光背景作为中央容器：标题栏/导航栏/页面全部半透明，透出流动光斑
     auto *central = new AuroraBackground(this);
+    {
+        // 恢复上次选择的背景粒子动效
+        QSettings settings;
+        central->setEffect(settings.value(QStringLiteral("ui/bgEffect"), 0).toInt());
+    }
     QVBoxLayout *root = new QVBoxLayout(central);
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
@@ -486,6 +517,26 @@ void MainWindow::buildUi()
     QAction *darkAction = appMenu->addAction(QStringLiteral("深色模式"), this, &MainWindow::onToggleDarkMode);
     darkAction->setCheckable(true);
     darkAction->setChecked(Theme::isDark());
+
+    // 背景粒子动效选择（单选，持久化）
+    QMenu *bgMenu = appMenu->addMenu(QStringLiteral("背景动效"));
+    auto *bgGroup = new QActionGroup(bgMenu);
+    bgGroup->setExclusive(true);
+    const QStringList bgNames = {
+        QStringLiteral("星点连线"), QStringLiteral("萤火流光"),
+        QStringLiteral("气泡上升"), QStringLiteral("雪花飘落"),
+        QStringLiteral("流星划过")
+    };
+    for (int i = 0; i < bgNames.size() && i < AuroraBackground::EffectCount; ++i) {
+        QAction *a = bgMenu->addAction(bgNames[i]);
+        a->setCheckable(true);
+        a->setChecked(i == central->effect());
+        bgGroup->addAction(a);
+        connect(a, &QAction::triggered, this, [central, i]() {
+            central->setEffect(i);
+            QSettings().setValue(QStringLiteral("ui/bgEffect"), i);
+        });
+    }
     appMenu->addSeparator();
     appMenu->addAction(Icons::icon(Icons::Import, 14, Theme::textSecondary()),
                        QStringLiteral("导入数据"), this, &MainWindow::onImportClicked);
@@ -691,14 +742,14 @@ QWidget* MainWindow::buildDetailPanel()
     card->addWidget(m_detailsEdit);
 
     card->addWidget(makeLabel(QStringLiteral("优先级"), m_detailCard));
-    m_priorityCombo = new QComboBox(m_detailCard);
+    m_priorityCombo = new NoWheelComboBox(m_detailCard);
     m_priorityCombo->addItem(coloredDot(Theme::textMuted()), QStringLiteral("低优先级"));
     m_priorityCombo->addItem(coloredDot(Theme::warning()), QStringLiteral("中优先级"));
     m_priorityCombo->addItem(coloredDot(Theme::danger()), QStringLiteral("高优先级"));
     card->addWidget(m_priorityCombo);
 
     card->addWidget(makeLabel(QStringLiteral("标签颜色"), m_detailCard));
-    m_tagColorCombo = new QComboBox(m_detailCard);
+    m_tagColorCombo = new NoWheelComboBox(m_detailCard);
     {
         const QStringList names = {QStringLiteral("蓝色"), QStringLiteral("绿色"), QStringLiteral("红色"),
                                    QStringLiteral("橙色"), QStringLiteral("紫色"), QStringLiteral("青色")};

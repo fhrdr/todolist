@@ -96,30 +96,31 @@ public:
         QLabel *label = new QLabel(text, m_panel);
         label->setWordWrap(true);
         label->setStyleSheet(QStringLiteral(
-            "color: %1; font-size: 14px; background: transparent;")
+            "color: %1; font-size: 14px; background: transparent; padding: 2px 4px;")
             .arg(Theme::textPrimary().name()));
         return label;
     }
 
-    // 标准按钮行：右对齐 [确定(主按钮)] [取消(描边按钮)]，与全局按钮风格统一
+    // 标准按钮行：居中 [确定(主按钮)] [取消(描边按钮)]，与全局按钮风格统一
     void addStandardButtons(QPushButton *&okBtn, QPushButton *&cancelBtn,
                             const QString &okText = QStringLiteral("确定"))
     {
         QHBoxLayout *row = new QHBoxLayout();
-        row->setContentsMargins(0, 4, 0, 0);
-        row->setSpacing(10);
+        row->setContentsMargins(0, 6, 0, 0);
+        row->setSpacing(12);
         row->addStretch(1);
 
         okBtn = new QPushButton(okText, m_panel);
         okBtn->setProperty("variant", "primary");
         okBtn->setDefault(true);
-        okBtn->setMinimumWidth(84);
+        okBtn->setMinimumWidth(96);
         row->addWidget(okBtn);
 
         cancelBtn = new QPushButton(QStringLiteral("取消"), m_panel);
-        cancelBtn->setMinimumWidth(84);
+        cancelBtn->setMinimumWidth(96);
         row->addWidget(cancelBtn);
 
+        row->addStretch(1);
         m_body->addLayout(row);
 
         QObject::connect(okBtn, &QPushButton::clicked, this, &QDialog::accept);
@@ -268,13 +269,14 @@ private:
         dialog.body()->addWidget(dialog.makeLabel(message));
 
         QHBoxLayout *row = new QHBoxLayout();
-        row->setContentsMargins(0, 4, 0, 0);
+        row->setContentsMargins(0, 6, 0, 0);
         row->addStretch(1);
         QPushButton *okBtn = new QPushButton(QStringLiteral("确定"));
         okBtn->setProperty("variant", "primary");
         okBtn->setDefault(true);
-        okBtn->setMinimumWidth(84);
+        okBtn->setMinimumWidth(96);
         row->addWidget(okBtn);
+        row->addStretch(1);
         dialog.body()->addLayout(row);
         QObject::connect(okBtn, &QPushButton::clicked, &dialog, &QDialog::accept);
 

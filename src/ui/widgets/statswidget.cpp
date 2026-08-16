@@ -235,19 +235,18 @@ void StatsRingCard::paintEvent(QPaintEvent *event)
     const int penW = qMax(10, side / 14);
 
     // 轨道
-    painter.setPen(QPen(Theme::withAlpha(Theme::textMuted(), 50), penW,
+    painter.setPen(QPen(Theme::withAlpha(Theme::glassBorder(), 130), penW,
                         Qt::SolidLine, Qt::RoundCap));
     painter.setBrush(Qt::NoBrush);
     painter.drawArc(ringRect, 0, 360 * 16);
 
-    // 进度弧：锥形霓虹渐变 + 发光底层
+    // 进度弧：青 -> 紫 锥形渐变 + 发光底层
     if (m_progress > 0.001) {
         const int span = static_cast<int>(-m_progress * 360 * 16);
 
         QConicalGradient conic(ringRect.center(), 90);
         conic.setColorAt(0.0, Theme::primary());
-        conic.setColorAt(0.5, Theme::accent());
-        conic.setColorAt(1.0, Theme::neonPink());
+        conic.setColorAt(1.0, Theme::accent());
 
         painter.setPen(QPen(Theme::withAlpha(Theme::primary(), 46), penW + 10,
                             Qt::SolidLine, Qt::RoundCap));
@@ -408,7 +407,7 @@ void StatsBarChart::paintEvent(QPaintEvent *event)
 StatsHeatmap::StatsHeatmap(QWidget *parent)
     : QWidget(parent)
 {
-    setFixedHeight(232);
+    setFixedHeight(248);
     setMouseTracking(true);
     m_hover.attach(this);
 }
@@ -422,18 +421,18 @@ void StatsHeatmap::setDailyMap(const QHash<QDate, int> &map)
 StatsHeatmap::GridLayout StatsHeatmap::gridLayout() const
 {
     GridLayout g;
-    g.cell = 14;
-    g.gap  = 4;
     const int pad = kCardPadding;
     const int weekdayLabelW = 26;   // 左侧星期标签列宽
     const int monthLabelH   = 16;   // 顶部月份标签行高
 
-    // 列数随宽度自适应（右对齐：最新一周在最右列）
+    // 固定 kHeatmapDays 天（列 = 周）；格子尺寸随宽度自适应，过宽时居中显示
+    g.cols = kHeatmapDays / 7;
+    g.gap  = 4;
     const int availW = width() - 2 * pad - weekdayLabelW;
-    g.cols = qBound(8, (availW + g.gap) / (g.cell + g.gap), kHeatmapDays / 7);
+    g.cell = qBound(10, (availW + g.gap) / g.cols - g.gap, 18);
 
     const int gridW = g.cols * (g.cell + g.gap) - g.gap;
-    g.gridX = width() - pad - gridW;
+    g.gridX = pad + weekdayLabelW + qMax(0, (availW - gridW) / 2);
     g.gridY = pad + 34 + monthLabelH;
 
     // 周对齐：最后一列包含今天，每列从周一开始（Qt：周一 = 1）
@@ -534,6 +533,7 @@ void StatsHeatmap::paintEvent(QPaintEvent *event)
     }
 
     // ---- 方格：列 = 周（周一起始），行 = 星期 ----
+    const qreal cellRadius = g.cell >= 15 ? 4.0 : 3.0;
     for (int c = 0; c < g.cols; ++c) {
         for (int r = 0; r < 7; ++r) {
             const QDate date = g.firstDay.addDays(c * 7 + r);
@@ -542,43 +542,47 @@ void StatsHeatmap::paintEvent(QPaintEvent *event)
             const QRectF cellRect(g.gridX + c * pitch, g.gridY + r * pitch, g.cell, g.cell);
             const int count = m_map.value(date, 0);
             if (count <= 0 || maxCount <= 0) {
-                painter.setPen(QPen(Theme::glassBorder(), 1));
+                painter.setPen(QPen(Theme::withAlpha(Theme::glassBorder(), 110), 1));
                 painter.setBrush(Theme::glassBg());
             } else {
-                // 4 档霓虹色阶：越深 -> 越亮
+                // 4 档霓虹色阶：越深 -> 越亮（伽马微调让中档更有层次）
                 const qreal level = qMin<qreal>(1.0, (qreal)count / qMax(1, maxCount));
                 QColor c = Theme::mix(Theme::primary(), Theme::accent(), level);
-                c.setAlpha(Theme::isDark() ? (90 + (int)(165 * level)) : (70 + (int)(150 * level)));
+                c.setAlpha(Theme::isDark() ? (110 + (int)(145 * level))
+                                           : (95 + (int)(140 * level)));
                 painter.setPen(Qt::NoPen);
                 painter.setBrush(c);
             }
-            painter.drawRoundedRect(cellRect, 3, 3);
+            painter.drawRoundedRect(cellRect, cellRadius, cellRadius);
 
             // 悬停高亮描边
             if (date == m_hoveredDate) {
                 painter.setPen(QPen(Theme::withAlpha(Theme::textPrimary(), 220), 1.4));
                 painter.setBrush(Qt::NoBrush);
-                painter.drawRoundedRect(cellRect.adjusted(-1.2, -1.2, 1.2, 1.2), 4, 4);
+                painter.drawRoundedRect(cellRect.adjusted(-1.2, -1.2, 1.2, 1.2),
+                                        cellRadius + 1, cellRadius + 1);
             }
         }
     }
 
-    // ---- 底部图例：少 -> 多 ----
+    // ---- 底部图例：少 -> 多（跟随网格右缘对齐） ----
     painter.setFont(Theme::font(Theme::fontSmall));
     painter.setPen(Theme::textMuted());
     const QString lessText = QStringLiteral("少");
     const QString moreText = QStringLiteral("多");
     const QFontMetrics fm(painter.font());
     const int legendY = g.gridY + 7 * pitch - g.gap + 10;
-    int legendX = width() - pad - fm.horizontalAdvance(lessText) - fm.horizontalAdvance(moreText)
+    const int gridRight = g.gridX + g.cols * pitch - g.gap;
+    int legendX = gridRight - fm.horizontalAdvance(lessText) - fm.horizontalAdvance(moreText)
                   - 5 * (10 + g.gap) - 16;
     painter.drawText(QRect(legendX, legendY, 30, 12), Qt::AlignLeft | Qt::AlignVCenter, lessText);
     legendX += fm.horizontalAdvance(lessText) + 6;
     for (int i = 0; i < 5; ++i) {
         const qreal t = i / 4.0;
         QColor c = Theme::mix(Theme::primary(), Theme::accent(), t);
-        c.setAlpha(i == 0 ? 40 : (Theme::isDark() ? 90 + (int)(165 * t) : 70 + (int)(150 * t)));
-        painter.setPen(Qt::NoPen);
+        c.setAlpha(i == 0 ? 40 : (Theme::isDark() ? 110 + (int)(145 * t) : 95 + (int)(140 * t)));
+        painter.setPen(i == 0 ? QPen(Theme::withAlpha(Theme::glassBorder(), 110), 1)
+                              : QPen(Qt::NoPen));
         painter.setBrush(i == 0 ? Theme::glassBg() : c);
         painter.drawRoundedRect(QRectF(legendX, legendY + 1, 10, 10), 2.5, 2.5);
         legendX += 10 + g.gap;
@@ -616,7 +620,7 @@ void StatsWidget::setupUI()
     mainLayout->setContentsMargins(kPageMargin, kPageMargin, kPageMargin, kPageMargin);
     mainLayout->setSpacing(kCardSpacing);
 
-    // 第一行：4 张概览卡
+    // 第一行：4 张概览卡（同色系渐变，色相区分语义：靛=总量 / 绿=完成 / 粉=今日 / 橙=连续）
     QHBoxLayout *overviewLayout = new QHBoxLayout();
     overviewLayout->setSpacing(kCardSpacing);
     m_totalCard = new StatsOverviewCard(QStringLiteral("总待办数"),
@@ -626,7 +630,7 @@ void StatsWidget::setupUI()
     m_todayCard = new StatsOverviewCard(QStringLiteral("今日完成"),
                                         Theme::neonPink(), Theme::accent(), content);
     m_streakCard = new StatsOverviewCard(QStringLiteral("连续完成 · 天"),
-                                         Theme::warning(), Theme::neonPink(), content);
+                                         Theme::warning(), Theme::danger(), content);
     overviewLayout->addWidget(m_totalCard, 1);
     overviewLayout->addWidget(m_completedCard, 1);
     overviewLayout->addWidget(m_todayCard, 1);

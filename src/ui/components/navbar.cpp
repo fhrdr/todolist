@@ -11,14 +11,20 @@
 
 namespace {
 
-// 页面切换过渡层：旧页快照覆盖在新页上淡出。
-// 快照一次性栅格化，动画期只做半透明贴图 blit（无布局/重绘开销，不卡顿）
+// 页面切换过渡层：内容淡入淡出，背景（极光粒子）全程保持不变。
+// 旧页内容先淡出 → 只剩背景 → 新页内容再淡入；两页内容任何时刻都不叠加。
+// 过渡期间新页面被临时隐藏（下方透出实时背景），动画结束后恢复显示。
+// 动画期每帧仅 1 次贴图 blit，无布局/重绘开销。
 class PageFadeOverlay : public QWidget
 {
 public:
-    PageFadeOverlay(const QPixmap &snapshot, QWidget *parent)
+    // parent = 页面容器（QStackedWidget）；hiddenPage = 过渡期间临时隐藏的新页
+    PageFadeOverlay(const QPixmap &oldShot, const QPixmap &newShot,
+                    QWidget *hiddenPage, QWidget *parent)
         : QWidget(parent)
-        , m_pm(snapshot)
+        , m_old(oldShot)
+        , m_new(newShot)
+        , m_hiddenPage(hiddenPage)
     {
         setAttribute(Qt::WA_TranslucentBackground);
         setAttribute(Qt::WA_TransparentForMouseEvents);
@@ -27,29 +33,51 @@ public:
         raise();
 
         auto *anim = new QVariantAnimation(this);
-        anim->setDuration(230);
-        anim->setStartValue(1.0);
-        anim->setEndValue(0.0);
-        anim->setEasingCurve(QEasingCurve::OutCubic);
+        anim->setDuration(360);              // 两段各 ~180ms
+        anim->setStartValue(0.0);
+        anim->setEndValue(1.0);
         connect(anim, &QVariantAnimation::valueChanged, this, [this](const QVariant &v) {
-            m_opacity = v.toReal();
+            m_t = v.toReal();
             update();
         });
-        connect(anim, &QVariantAnimation::finished, this, &QObject::deleteLater);
+        connect(anim, &QVariantAnimation::finished, this, [this]() {
+            restorePage();
+            deleteLater();
+        });
         anim->start(QAbstractAnimation::DeleteWhenStopped);
+    }
+
+    // 恢复被临时隐藏的页面（动画正常结束或被打断时都要调用）
+    void restorePage()
+    {
+        if (m_hiddenPage) {
+            m_hiddenPage->setVisible(true);
+            m_hiddenPage = nullptr;
+        }
     }
 
 protected:
     void paintEvent(QPaintEvent *) override
     {
         QPainter p(this);
-        p.setOpacity(m_opacity);
-        p.drawPixmap(0, 0, m_pm);
+        if (m_t < 0.5) {
+            // 阶段一：旧页内容加速淡出（露出背景）
+            const qreal k = m_t * 2.0;
+            p.setOpacity(1.0 - k * k);              // InQuad：起步柔、收尾快
+            p.drawPixmap(0, 0, m_old);
+        } else {
+            // 阶段二：新页内容从背景中减速淡入
+            const qreal k = (m_t - 0.5) * 2.0;
+            p.setOpacity(1.0 - (1.0 - k) * (1.0 - k));  // OutQuad：起步快、收尾柔
+            p.drawPixmap(0, 0, m_new);
+        }
     }
 
 private:
-    QPixmap m_pm;
-    qreal m_opacity = 1.0;
+    QPixmap m_old;
+    QPixmap m_new;
+    QPointer<QWidget> m_hiddenPage;
+    qreal m_t = 0.0;
 };
 
 } // namespace
@@ -148,19 +176,35 @@ void NavBar::slideToPage(int index)
         return;
     }
 
-    // 切换前抓取旧页快照（必须在切页前截取，否则旧页被隐藏）。
-    // 注意：不能用 grab()——它对无 WA_TranslucentBackground 的控件
+    // 打断进行中的过渡：先恢复被临时隐藏的页面并销毁旧过渡层
+    if (m_fadeOverlay) {
+        static_cast<PageFadeOverlay *>(m_fadeOverlay.data())->restorePage();
+        delete m_fadeOverlay.data();
+        m_fadeOverlay = nullptr;
+        m_fadeHiddenPage = nullptr;
+    }
+
+    // 快照抓取：不能用 grab()——它对无 WA_TranslucentBackground 的控件
     // 会用调色板默认底色（白）填充未绘制区域，暗色模式下就是白屏。
-    // 这里手动透明底 + render，保留页面真实的透明区域。
+    // 手动透明底 + render，保留页面真实的透明区域。
+    auto renderPage = [](QWidget *w) -> QPixmap {
+        if (!w || w->width() <= 0 || w->height() <= 0) {
+            return QPixmap();
+        }
+        const qreal dpr = w->devicePixelRatioF();
+        QPixmap pm(w->size() * dpr);
+        pm.setDevicePixelRatio(dpr);
+        pm.fill(Qt::transparent);
+        QPainter p(&pm);
+        w->render(&p, QPoint(), QRegion(), QWidget::DrawChildren);
+        return pm;
+    };
+
+    // 切页前抓旧页快照（之后旧页会被隐藏）
     QWidget *oldPage = m_stack->currentWidget();
-    QPixmap snapshot;
-    if (oldPage && oldPage->isVisible() && oldPage->width() > 0 && oldPage->height() > 0) {
-        const qreal dpr = oldPage->devicePixelRatioF();
-        snapshot = QPixmap(oldPage->size() * dpr);
-        snapshot.setDevicePixelRatio(dpr);
-        snapshot.fill(Qt::transparent);
-        QPainter p(&snapshot);
-        oldPage->render(&p, QPoint(), QRegion(), QWidget::DrawChildren);
+    QPixmap oldShot;
+    if (oldPage && oldPage->isVisible()) {
+        oldShot = renderPage(oldPage);
     }
 
     m_stack->setCurrentIndex(index);
@@ -169,11 +213,21 @@ void NavBar::slideToPage(int index)
         return;
     }
 
-    // 快照覆盖在新页上淡出：动画期每帧仅一次半透明 blit，
-    // 不再移动布局管理的页面（原 pos 动画与 QStackedLayout 冲突导致卡顿）
-    if (!snapshot.isNull()) {
-        new PageFadeOverlay(snapshot, page);   // 自管理：动画结束自动销毁
+    // 切页后新页已可见，抓新页快照
+    const QPixmap newShot = renderPage(page);
+    if (oldShot.isNull() || newShot.isNull()) {
+        return;
     }
+
+    // 过渡期间临时隐藏新页（下方透出实时背景），内容淡入淡出、背景不变
+    page->setVisible(false);
+    auto *overlay = new PageFadeOverlay(oldShot, newShot, page, m_stack);   // 自管理
+    m_fadeOverlay = overlay;
+    m_fadeHiddenPage = page;
+    connect(overlay, &QObject::destroyed, this, [this]() {
+        m_fadeOverlay = nullptr;
+        m_fadeHiddenPage = nullptr;
+    });
 }
 
 void NavBar::resizeEvent(QResizeEvent *event)
