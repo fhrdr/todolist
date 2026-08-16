@@ -15,7 +15,6 @@
 #include <QCursor>
 #include <QDate>
 #include <QStringList>
-#include <QRandomGenerator>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
@@ -24,6 +23,10 @@
 #include <QJsonArray>
 #include <QInputDialog>
 #include <QUrl>
+#include <QCursor>
+#include <QRandomGenerator>
+#include <QVariantAnimation>
+#include <QEasingCurve>
 #include <algorithm>
 #include <cmath>
 
@@ -37,24 +40,7 @@ constexpr int RoleColor     = Qt::UserRole + 3;
 constexpr int RoleDueText   = Qt::UserRole + 4;   // 倒数日文案（"剩 3 天"）
 constexpr int RoleDueUrgent = Qt::UserRole + 5;   // 倒数日是否紧急（今天/过期）
 
-constexpr int kShadowMargin = 12;   // 纸张外圈阴影留白
-
-// 纸张配色（顶色 / 底色 / 强调色）
-struct PaperColors { QColor top, bottom, accent; };
-PaperColors paperColors(int theme)
-{
-    switch (theme) {
-    case DesktopWidget::Sakura: return { QColor(0xFF, 0xE4, 0xEC), QColor(0xFF, 0xCF, 0xE0), QColor(0xEC, 0x40, 0x7A) };
-    case DesktopWidget::Mint:   return { QColor(0xE0, 0xF5, 0xE9), QColor(0xC6, 0xED, 0xD6), QColor(0x26, 0xA6, 0x9A) };
-    case DesktopWidget::Sky:    return { QColor(0xE1, 0xF0, 0xFA), QColor(0xC8, 0xE2, 0xF5), QColor(0x42, 0xA5, 0xF5) };
-    case DesktopWidget::Cream:  return { QColor(0xFF, 0xFD, 0xF4), QColor(0xFB, 0xF3, 0xDC), QColor(0xC0, 0xA0, 0x62) };
-    default:                    return { QColor(0xFF, 0xF9, 0xC4), QColor(0xFF, 0xEC, 0xA0), QColor(0xF9, 0xA8, 0x25) };
-    }
-}
-
-const QColor kTextWarm   (0x5D, 0x40, 0x37);   // 纸张上的暖棕文字
-const QColor kTextSoft   (0x8D, 0x6E, 0x63);
-const QColor kLineBrown  (0x7A, 0x5C, 0x4F);
+constexpr int kShadowMargin = 14;   // 玻璃纸外圈阴影留白
 
 // ---- 每日一句 ----
 const QStringList kDailyQuotes = {
@@ -106,13 +92,70 @@ QPainterPath cloudPath(const QRectF &r)
     return p.simplified();
 }
 
-// ---- 便利贴列表代理：手绘圆圈复选框 + 标题 + 倒数日 ----
+// ---- 霓虹进度条：玻璃轨道 + 青紫渐变填充 + 发光（带平滑动画） ----
+class NeonProgressBar : public QWidget
+{
+public:
+    explicit NeonProgressBar(QWidget *parent = nullptr) : QWidget(parent)
+    {
+        setFixedHeight(10);
+        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+
+        m_anim = new QVariantAnimation(this);
+        m_anim->setDuration(600);
+        m_anim->setEasingCurve(QEasingCurve::OutCubic);
+        connect(m_anim, &QVariantAnimation::valueChanged, this, [this](const QVariant &v) {
+            m_ratio = v.toReal();
+            update();
+        });
+    }
+
+    void setRatio(qreal ratio)
+    {
+        ratio = qBound<qreal>(0.0, ratio, 1.0);
+        m_anim->stop();
+        m_anim->setStartValue(m_ratio);
+        m_anim->setEndValue(ratio);
+        m_anim->start();
+    }
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing);
+
+        const QRectF track(0, (height() - 5) / 2.0, width(), 5);
+        p.setPen(Qt::NoPen);
+        p.setBrush(Theme::glassBgStrong());
+        p.drawRoundedRect(track, 2.5, 2.5);
+
+        if (m_ratio > 0.001) {
+            const qreal w = qMax<qreal>(5.0, track.width() * m_ratio);
+            const QRectF fill(track.left(), track.top(), w, track.height());
+
+            // 发光底层
+            p.setBrush(Theme::withAlpha(Theme::primary(), 40));
+            p.drawRoundedRect(fill.adjusted(0, -2, 0, 2), 4, 4);
+
+            QLinearGradient grad(track.topLeft(), track.topRight());
+            grad.setColorAt(0, Theme::primary());
+            grad.setColorAt(1, Theme::accent());
+            p.setBrush(QBrush(grad));
+            p.drawRoundedRect(fill, 2.5, 2.5);
+        }
+    }
+
+private:
+    qreal m_ratio = 0.0;
+    QVariantAnimation *m_anim = nullptr;
+};
+
+// ---- 便利贴列表代理：霓虹复选框 + 标题 + 倒数日贴片（暗色玻璃风） ----
 class StickyNoteDelegate : public QStyledItemDelegate
 {
 public:
     explicit StickyNoteDelegate(QListWidget *view) : QStyledItemDelegate(view) {}
-
-    QColor accent = QColor(0xF9, 0xA8, 0x25);
 
     static QRect checkRect(const QRect &itemRect)
     {
@@ -132,31 +175,34 @@ public:
         const QString due    = index.data(RoleDueText).toString();
         const bool dueUrgent = index.data(RoleDueUrgent).toBool();
 
-        // 悬停背景
+        // 悬停：玻璃光晕
         if (hovered && !completed) {
             p->setPen(Qt::NoPen);
-            p->setBrush(QColor(255, 255, 255, 110));
+            p->setBrush(Theme::hoverGlow());
             p->drawRoundedRect(option.rect.adjusted(2, 2, -2, -2), 8, 8);
         }
 
         int x = option.rect.left() + 4;
         const int cy = option.rect.center().y();
 
-        // 手绘圆圈复选框
+        // 霓虹圆圈复选框
         QRect circle(x + 2, cy - 8, 16, 16);
         if (completed) {
+            QLinearGradient grad(circle.topLeft(), circle.bottomRight());
+            grad.setColorAt(0, Theme::primary());
+            grad.setColorAt(1, Theme::accent());
             p->setPen(Qt::NoPen);
-            p->setBrush(accent);
+            p->setBrush(QBrush(grad));
             p->drawEllipse(circle);
             QPainterPath check;
             check.moveTo(circle.left() + 4.5, circle.center().y());
             check.lineTo(circle.center().x() - 0.5, circle.bottom() - 4.5);
             check.lineTo(circle.right() - 4, circle.top() + 5);
-            p->setPen(QPen(Qt::white, 2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            p->setPen(QPen(QColor(0x0B, 0x0E, 0x1A), 2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
             p->setBrush(Qt::NoBrush);
             p->drawPath(check);
         } else {
-            p->setPen(QPen(hovered ? accent : kTextSoft, 1.8));
+            p->setPen(QPen(hovered ? Theme::primary() : Theme::withAlpha(Theme::textMuted(), 160), 1.8));
             p->setBrush(Qt::NoBrush);
             p->drawEllipse(circle);
         }
@@ -165,7 +211,7 @@ public:
         // 优先级点
         if (priority > 0 && !completed) {
             p->setPen(Qt::NoPen);
-            p->setBrush(priority == 2 ? QColor(0xE5, 0x39, 0x35) : QColor(0xFB, 0x8C, 0x00));
+            p->setBrush(priority == 2 ? Theme::danger() : Theme::warning());
             p->drawEllipse(x, cy - 3, 6, 6);
             x += 11;
         }
@@ -180,7 +226,7 @@ public:
             x += 11;
         }
 
-        // 倒数日（右侧）
+        // 倒数日（右侧贴片）
         int titleRight = option.rect.right() - 8;
         if (!due.isEmpty()) {
             QFont dueFont(QStringLiteral("Microsoft YaHei UI"), -1);
@@ -189,10 +235,11 @@ public:
             int dw = dfm.horizontalAdvance(due) + 12;
             QRect dueRect(titleRight - dw, cy - 9, dw, 18);
             p->setPen(Qt::NoPen);
-            p->setBrush(dueUrgent ? QColor(0xE5, 0x39, 0x35, 26) : QColor(0x7A, 0x5C, 0x4F, 18));
+            p->setBrush(dueUrgent ? Theme::withAlpha(Theme::danger(), 40)
+                                  : Theme::glassBgStrong());
             p->drawRoundedRect(dueRect, 9, 9);
             p->setFont(dueFont);
-            p->setPen(dueUrgent ? QColor(0xE5, 0x39, 0x35) : kTextSoft);
+            p->setPen(dueUrgent ? Theme::danger() : Theme::textSecondary());
             p->drawText(dueRect, Qt::AlignCenter, due);
             titleRight = dueRect.left() - 6;
         }
@@ -202,7 +249,7 @@ public:
         titleFont.setPixelSize(14);
         titleFont.setStrikeOut(completed);
         p->setFont(titleFont);
-        p->setPen(completed ? QColor(0xB0, 0x9C, 0x92) : kTextWarm);
+        p->setPen(completed ? Theme::textMuted() : Theme::textPrimary());
         QFontMetrics tfm(titleFont);
         int maxW = qMax(titleRight - x, 20);
         p->drawText(QRect(x, option.rect.top(), maxW, option.rect.height()),
@@ -244,6 +291,24 @@ DesktopWidget::DesktopWidget(QWidget *parent)
     connect(m_refreshTimer, &QTimer::timeout, this, &DesktopWidget::onRefreshTimer);
     m_refreshTimer->start();
 
+    // 内部粒子动效
+    m_clock.start();
+    initNoteParticles();
+    m_animTimer = new QTimer(this);
+    m_animTimer->setInterval(50);   // 20fps，便签足够流畅且省电
+    connect(m_animTimer, &QTimer::timeout, this, [this]() {
+        if (!isVisible()) {
+            m_lastTick = m_clock.elapsed();
+            return;
+        }
+        const qint64 now = m_clock.elapsed();
+        const qreal dt = qMin<qreal>((now - m_lastTick) / 1000.0, 0.1);
+        m_lastTick = now;
+        advanceNoteParticles(dt);
+        update();
+    });
+    m_animTimer->start();
+
     // 天气：立即获取 + 每 30 分钟自动刷新
     m_netManager = new QNetworkAccessManager(this);
     m_weatherTimer = new QTimer(this);
@@ -253,7 +318,6 @@ DesktopWidget::DesktopWidget(QWidget *parent)
     fetchWeather();
 
     updateHeader();
-    scheduleBlink();
 
     setMouseTracking(true);
     m_todoListWidget->setMouseTracking(true);
@@ -274,13 +338,13 @@ DesktopWidget::~DesktopWidget()
 
 void DesktopWidget::setupUI()
 {
-    // 纸张外侧留出阴影空间；顶部多留空间给胶带
+    // 玻璃纸外侧留出阴影空间
     auto *mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(kShadowMargin + 8, kShadowMargin + 22,
-                                   kShadowMargin + 8, kShadowMargin + 8);
+    mainLayout->setContentsMargins(kShadowMargin + 10, kShadowMargin + 14,
+                                   kShadowMargin + 10, kShadowMargin + 10);
     mainLayout->setSpacing(4);
 
-    // 头部：日期 + 置顶按钮
+    // 头部：日期 + 天气贴片（绘制） + 置顶按钮
     auto *headerRow = new QHBoxLayout();
     headerRow->setContentsMargins(2, 0, 0, 0);
     headerRow->setSpacing(4);
@@ -317,6 +381,11 @@ void DesktopWidget::setupUI()
     m_dueLabel->setVisible(false);
     quoteRow->addWidget(m_dueLabel);
     mainLayout->addLayout(quoteRow);
+
+    // 霓虹进度条
+    m_progressBar = new NeonProgressBar(this);
+    mainLayout->addSpacing(4);
+    mainLayout->addWidget(m_progressBar);
     mainLayout->addSpacing(4);
 
     // 待办列表
@@ -327,15 +396,10 @@ void DesktopWidget::setupUI()
     m_todoListWidget->setFrameShape(QFrame::NoFrame);
     mainLayout->addWidget(m_todoListWidget, 1);
 
-    // 快速添加（右侧留白给卡通猫）
-    auto *addRow = new QHBoxLayout();
-    addRow->setContentsMargins(2, 0, 0, 0);
-    addRow->setSpacing(0);
+    // 快速添加
     m_addLineEdit = new QLineEdit(this);
     m_addLineEdit->setPlaceholderText(QStringLiteral("+ 添加待办，回车保存"));
-    addRow->addWidget(m_addLineEdit, 1);
-    addRow->addSpacing(58);
-    mainLayout->addLayout(addRow);
+    mainLayout->addWidget(m_addLineEdit);
 }
 
 void DesktopWidget::setupConnections()
@@ -349,64 +413,47 @@ void DesktopWidget::setupConnections()
 // 主题 / 外观
 // ==========================================================
 
-QColor DesktopWidget::paperTop() const    { return paperColors(m_theme).top; }
-QColor DesktopWidget::paperBottom() const { return paperColors(m_theme).bottom; }
-QColor DesktopWidget::accentColor() const { return paperColors(m_theme).accent; }
-
 void DesktopWidget::applyTheme()
 {
-    const QString textWarm = kTextWarm.name();
-    const QString textSoft = kTextSoft.name();
-
     m_dateLabel->setStyleSheet(QStringLiteral(
-        "color: %1; font-size: 15px; font-weight: 700; background: transparent;").arg(textWarm));
+        "color: %1; font-size: 15px; font-weight: 700; background: transparent;")
+        .arg(Theme::textPrimary().name()));
     m_countLabel->setStyleSheet(QStringLiteral(
-        "color: %1; font-size: 11px; background: transparent;").arg(textSoft));
+        "color: %1; font-size: 11px; background: transparent;")
+        .arg(Theme::textSecondary().name()));
     m_quoteLabel->setStyleSheet(QStringLiteral(
-        "color: %1; font-size: 12px; font-style: italic; background: transparent;").arg(textSoft));
+        "color: %1; font-size: 12px; font-style: italic; background: transparent;")
+        .arg(Theme::textMuted().name()));
 
     m_todoListWidget->setStyleSheet(QStringLiteral(
         "QListWidget { border: none; background: transparent; }"
         "QScrollBar:vertical { background: transparent; width: 6px; margin: 2px; }"
         "QScrollBar::handle:vertical { background: %1; border-radius: 3px; min-height: 24px; }"
+        "QScrollBar::handle:vertical:hover { background: %2; }"
         "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }"
         "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }")
-        .arg(QColor(kLineBrown.red(), kLineBrown.green(), kLineBrown.blue(), 70).name(QColor::HexArgb)));
+        .arg(Theme::withAlpha(Theme::textMuted(), 90).name(QColor::HexArgb),
+             Theme::withAlpha(Theme::primary(), 140).name(QColor::HexArgb)));
 
     m_addLineEdit->setStyleSheet(QStringLiteral(
-        "QLineEdit { border: none; border-bottom: 1px dashed %1; background: transparent;"
+        "QLineEdit { border: none; border-bottom: 1px solid %1; background: transparent;"
         "            color: %2; font-size: 13px; padding: 6px 2px; }"
         "QLineEdit:focus { border-bottom: 1px solid %3; }")
-        .arg(QColor(kTextSoft.red(), kTextSoft.green(), kTextSoft.blue(), 130).name(QColor::HexArgb),
-             textWarm, accentColor().name()));
+        .arg(Theme::glassBorder().name(QColor::HexArgb),
+             Theme::textPrimary().name(),
+             Theme::primary().name()));
 
     m_pinButton->setStyleSheet(QStringLiteral(
         "QPushButton { border: none; background: transparent; border-radius: 13px; }"
-        "QPushButton:hover { background: rgba(255, 255, 255, 0.45); }"));
+        "QPushButton:hover { background: %1; }")
+        .arg(Theme::hoverGlow().name(QColor::HexArgb)));
     m_pinButton->setIcon(Icons::icon(Icons::Pin, 14,
-                                     m_alwaysOnTop ? accentColor()
-                                                   : QColor(0xB0, 0xA3, 0x98)));
+                                     m_alwaysOnTop ? Theme::primary()
+                                                   : Theme::textMuted()));
 
-    if (auto *d = static_cast<StickyNoteDelegate*>(m_todoListWidget->itemDelegate())) {
-        d->accent = accentColor();
-    }
     m_todoListWidget->viewport()->update();
-    updateHeader();   // 倒计时贴片颜色随主题刷新
+    updateHeader();
     update();
-}
-
-void DesktopWidget::setPaperTheme(PaperTheme theme)
-{
-    m_theme = theme;
-    applyTheme();
-    saveAppearance();
-}
-
-void DesktopWidget::setCharacter(Character character)
-{
-    m_character = character;
-    update();
-    saveAppearance();
 }
 
 void DesktopWidget::setNoteOpacity(qreal opacity)
@@ -472,17 +519,18 @@ void DesktopWidget::updateTodoList()
         listItem->setData(RolePriority, item.getPriority());
         listItem->setData(RoleColor, item.getTagColor());
 
-        // 倒数日
+        // 倒数日：只提示未过期的（过期的不打扰）
         if (item.getDueDate().isValid()) {
             const qint64 days = today.daysTo(item.getDueDate());
-            QString text;
-            bool urgent = false;
-            if (days < 0)       { text = QStringLiteral("过期 %1 天").arg(-days); urgent = true; }
-            else if (days == 0) { text = QStringLiteral("今天"); urgent = true; }
-            else if (days == 1) { text = QStringLiteral("明天"); urgent = true; }
-            else                { text = QStringLiteral("剩 %1 天").arg(days); }
-            listItem->setData(RoleDueText, text);
-            listItem->setData(RoleDueUrgent, urgent);
+            if (days >= 0) {
+                QString text;
+                bool urgent = false;
+                if (days == 0)      { text = QStringLiteral("今天"); urgent = true; }
+                else if (days == 1) { text = QStringLiteral("明天"); urgent = true; }
+                else                { text = QStringLiteral("剩 %1 天").arg(days); }
+                listItem->setData(RoleDueText, text);
+                listItem->setData(RoleDueUrgent, urgent);
+            }
         }
         m_todoListWidget->addItem(listItem);
     }
@@ -501,17 +549,26 @@ void DesktopWidget::updateHeader()
     m_countLabel->setText(n > 0 ? QStringLiteral("还有 %1 件待办").arg(n)
                                 : QStringLiteral("全部完成啦"));
 
-    // 倒计时贴片：最近的未完成到期事项（m_displayItems 已按到期排序，取第一个有到期日的）
-    m_dueUrgent = false;
+    // 进度条：已完成 / 总数
+    int total = 0, done = 0;
+    for (const TodoFolder &folder : m_folders) {
+        total += folder.getItemCount();
+        done += folder.getCompletedCount();
+    }
+    static_cast<NeonProgressBar*>(m_progressBar)
+        ->setRatio(total > 0 ? qreal(done) / qreal(total) : 0.0);
+
+    // 倒计时贴片：最近的未完成到期事项（只提示未过期的）
+    bool dueUrgent = false;
     QString dueText;
     for (const TodoItem &item : m_displayItems) {
         if (!item.getDueDate().isValid()) continue;
         const qint64 days = today.daysTo(item.getDueDate());
+        if (days < 0) continue;   // 过期的不打扰
         QString title = item.getTitle();
         if (title.length() > 6) title = title.left(6) + QStringLiteral("…");
-        if (days < 0)       { dueText = QStringLiteral("「%1」已过期 %2 天").arg(title).arg(-days); m_dueUrgent = true; }
-        else if (days == 0) { dueText = QStringLiteral("今天到期「%1」").arg(title); m_dueUrgent = true; }
-        else if (days == 1) { dueText = QStringLiteral("明天到期「%1」").arg(title); m_dueUrgent = true; }
+        if (days == 0)      { dueText = QStringLiteral("今天到期「%1」").arg(title); dueUrgent = true; }
+        else if (days == 1) { dueText = QStringLiteral("明天到期「%1」").arg(title); dueUrgent = true; }
         else                { dueText = QStringLiteral("距「%1」还有 %2 天").arg(title).arg(days); }
         break;
     }
@@ -519,8 +576,8 @@ void DesktopWidget::updateHeader()
     m_dueLabel->setVisible(!dueText.isEmpty());
     m_dueLabel->setStyleSheet(QStringLiteral(
         "color: %1; font-size: 12px; background: transparent;%2")
-        .arg(m_dueUrgent ? accentColor().name() : kTextWarm.name(),
-             m_dueUrgent ? QStringLiteral(" font-weight: 700;") : QString()));
+        .arg(dueUrgent ? Theme::danger().name() : Theme::textSecondary().name(),
+             dueUrgent ? QStringLiteral(" font-weight: 700;") : QString()));
 
     updateQuote();
 }
@@ -584,402 +641,142 @@ void DesktopWidget::paintEvent(QPaintEvent *event)
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
 
-    drawPaper(p);
-    drawStarSticker(p);
-    drawCharacter(p);
-    drawProgressRing(p);
-    drawTape(p);
+    drawNote(p);
     drawWeather(p);
 
     // 空状态提示
     if (m_displayItems.isEmpty()) {
         p.setFont(Theme::font(13));
-        p.setPen(QColor(kTextSoft.red(), kTextSoft.green(), kTextSoft.blue(), 170));
-        QRect area = noteRect().adjusted(0, 60, 0, -50);
+        p.setPen(Theme::withAlpha(Theme::textMuted(), 190));
+        QRect area = noteRect().adjusted(0, 90, 0, -60);
         p.drawText(area, Qt::AlignHCenter | Qt::AlignTop,
                    QStringLiteral("暂无待办，喝杯茶吧~"));
     }
 }
 
-void DesktopWidget::drawPaper(QPainter &p)
+void DesktopWidget::initNoteParticles()
+{
+    m_particles.clear();
+    const QRect note = noteRect();
+    m_particleArea = note.size();
+
+    auto *rng = QRandomGenerator::global();
+    const int count = qBound(12, note.width() * note.height() / 11000, 20);
+    for (int i = 0; i < count; ++i) {
+        NoteParticle pt;
+        pt.x = note.left() + rng->generateDouble() * qMax(note.width(), 1);
+        pt.y = note.top() + rng->generateDouble() * qMax(note.height(), 1);
+        const qreal angle = rng->generateDouble() * 2 * M_PI;
+        const qreal speed = 8.0 + rng->generateDouble() * 14.0;
+        pt.vx = std::cos(angle) * speed;
+        pt.vy = std::sin(angle) * speed;
+        pt.size = 1.2 + rng->generateDouble() * 1.4;
+        pt.colorIdx = i;
+        m_particles.append(pt);
+    }
+}
+
+void DesktopWidget::advanceNoteParticles(qreal dt)
+{
+    const QRect note = noteRect();
+    if (note.size() != m_particleArea || m_particles.isEmpty()) {
+        initNoteParticles();
+        return;
+    }
+
+    for (NoteParticle &pt : m_particles) {
+        pt.x += pt.vx * dt;
+        pt.y += pt.vy * dt;
+
+        // 玻璃纸内反弹
+        if (pt.x < note.left())       { pt.x = note.left();       pt.vx = -pt.vx; }
+        if (pt.x > note.right())      { pt.x = note.right();      pt.vx = -pt.vx; }
+        if (pt.y < note.top())        { pt.y = note.top();        pt.vy = -pt.vy; }
+        if (pt.y > note.bottom())     { pt.y = note.bottom();     pt.vy = -pt.vy; }
+    }
+}
+
+void DesktopWidget::drawNote(QPainter &p)
 {
     const QRect note = noteRect();
 
-    // 柔和投影（多层外扩模拟模糊）
-    for (int i = 7; i >= 1; --i) {
+    // 深色柔和投影
+    for (int i = 5; i >= 1; --i) {
         p.setPen(Qt::NoPen);
-        p.setBrush(QColor(90, 70, 30, 5));
-        p.drawRoundedRect(note.adjusted(-i, -i + 3, i, i + 3), 12 + i, 12 + i);
+        p.setBrush(QColor(0, 0, 0, 12));
+        p.drawRoundedRect(note.adjusted(-i, -i + 3, i, i + 3), 14 + i, 14 + i);
     }
 
-    // 纸张渐变
+    // 玻璃纸：深空渐变底
     QLinearGradient grad(note.topLeft(), note.bottomLeft());
-    grad.setColorAt(0, paperTop());
-    grad.setColorAt(1, paperBottom());
+    grad.setColorAt(0, QColor(0x18, 0x1D, 0x33, 240));
+    grad.setColorAt(1, QColor(0x0B, 0x0E, 0x1A, 240));
     p.setBrush(grad);
     p.setPen(Qt::NoPen);
-    p.drawRoundedRect(note, 12, 12);
+    p.drawRoundedRect(note, 14, 14);
 
-    // 纸张横线纹理（极淡）
-    p.setPen(QPen(QColor(kTextSoft.red(), kTextSoft.green(), kTextSoft.blue(), 18), 1));
-    p.setClipRect(note.adjusted(10, 0, -10, -8));
-    for (int y = note.top() + 84; y < note.bottom() - 10; y += 30) {
-        p.drawLine(note.left() + 12, y, note.right() - 12, y);
-    }
-    p.setClipping(false);
-}
-
-void DesktopWidget::drawTape(QPainter &p)
-{
-    const QRect note = noteRect();
-
+    // 内部粒子动效（裁剪在玻璃纸内，漂浮 + 邻近连线 + 鼠标牵引）
     p.save();
-    p.translate(note.center().x(), note.top());
-    p.rotate(-2.5);
+    QPainterPath clipPath;
+    clipPath.addRoundedRect(note, 14, 14);
+    p.setClipPath(clipPath);
 
-    QRectF tape(-50, -11, 100, 22);
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(255, 255, 255, 120));
-    p.drawRoundedRect(tape, 3, 3);
-
-    // 胶带斜纹
-    p.setClipRect(tape);
-    QColor stripe = accentColor();
-    stripe.setAlpha(36);
-    p.setPen(QPen(stripe, 4));
-    for (qreal x = tape.left() - tape.height(); x < tape.right(); x += 12) {
-        p.drawLine(QPointF(x, tape.bottom()), QPointF(x + tape.height(), tape.top()));
-    }
-    p.restore();
-}
-
-void DesktopWidget::drawStarSticker(QPainter &p)
-{
-    const QRect note = noteRect();
-    const QPointF c(note.left() + 26, note.top() + 34);
-    const double ro = 9.0, ri = 3.8;
-
-    QPainterPath star;
-    for (int i = 0; i < 10; ++i) {
-        const double angle = -M_PI / 2 + i * M_PI / 5;
-        const double r = (i % 2 == 0) ? ro : ri;
-        const QPointF pt(c.x() + r * std::cos(angle), c.y() + r * std::sin(angle));
-        if (i == 0) star.moveTo(pt); else star.lineTo(pt);
-    }
-    star.closeSubpath();
-
-    p.save();
-    p.translate(c);
-    p.rotate(15);
-    p.translate(-c);
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(0xF6, 0xA5, 0xC0, 230));
-    p.drawPath(star);
-    p.restore();
-}
-
-void DesktopWidget::drawCharacter(QPainter &p)
-{
-    switch (m_character) {
-    case CharRabbit: drawRabbit(p); break;
-    case CharShiba:  drawShiba(p);  break;
-    default:         drawCat(p);    break;
-    }
-}
-
-void DesktopWidget::drawCat(QPainter &p)
-{
-    const QRect note = noteRect();
-    const QPointF c(note.right() - 42, note.bottom() - 14);   // 猫头中心
-    const double r = 18;
-
-    const QColor face(0xFF, 0xFD, 0xF8);
-    const QPen linePen(kLineBrown, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-
-    // 耳朵（在头后面）
-    p.setPen(linePen);
-    p.setBrush(face);
-    QPainterPath earL, earR;
-    earL.moveTo(c.x() - 15, c.y() - 8);  earL.lineTo(c.x() - 18, c.y() - 25); earL.lineTo(c.x() - 4, c.y() - 15); earL.closeSubpath();
-    earR.moveTo(c.x() + 15, c.y() - 8);  earR.lineTo(c.x() + 18, c.y() - 25); earR.lineTo(c.x() + 4, c.y() - 15); earR.closeSubpath();
-    p.drawPath(earL);
-    p.drawPath(earR);
-
-    // 内耳
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(0xF8, 0xC8, 0xD0));
-    QPainterPath innerL, innerR;
-    innerL.moveTo(c.x() - 13.5, c.y() - 11); innerL.lineTo(c.x() - 15.5, c.y() - 20); innerL.lineTo(c.x() - 7, c.y() - 14); innerL.closeSubpath();
-    innerR.moveTo(c.x() + 13.5, c.y() - 11); innerR.lineTo(c.x() + 15.5, c.y() - 20); innerR.lineTo(c.x() + 7, c.y() - 14); innerR.closeSubpath();
-    p.drawPath(innerL);
-    p.drawPath(innerR);
-
-    // 头
-    p.setPen(linePen);
-    p.setBrush(face);
-    p.drawEllipse(c, r, r);
-
-    // 眼睛：平时圆点，眨眼时弯月
-    p.setPen(linePen);
-    if (m_blink) {
-        p.setBrush(Qt::NoBrush);
-        p.drawArc(QRectF(c.x() - 11, c.y() - 6, 8, 7), 200 * 16, 140 * 16);
-        p.drawArc(QRectF(c.x() + 3,  c.y() - 6, 8, 7), 200 * 16, 140 * 16);
-    } else {
-        p.setBrush(kLineBrown);
-        p.drawEllipse(QPointF(c.x() - 7, c.y() - 2), 2.0, 2.4);
-        p.drawEllipse(QPointF(c.x() + 7, c.y() - 2), 2.0, 2.4);
-    }
-
-    // 嘴（小 w）
-    p.setBrush(Qt::NoBrush);
-    p.drawArc(QRectF(c.x() - 4.5, c.y() + 2, 4.5, 4), 200 * 16, 140 * 16);
-    p.drawArc(QRectF(c.x(),      c.y() + 2, 4.5, 4), 200 * 16, 140 * 16);
-
-    // 腮红
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(0xF8, 0xA5, 0xB8, 150));
-    p.drawEllipse(QPointF(c.x() - 12.5, c.y() + 4), 3.2, 2.4);
-    p.drawEllipse(QPointF(c.x() + 12.5, c.y() + 4), 3.2, 2.4);
-
-    // 爪子搭在纸张下缘
-    p.setPen(linePen);
-    p.setBrush(face);
-    p.drawEllipse(QPointF(c.x() - 11, note.bottom() - 2), 5.5, 4);
-    p.drawEllipse(QPointF(c.x() + 11, note.bottom() - 2), 5.5, 4);
-}
-
-void DesktopWidget::drawRabbit(QPainter &p)
-{
-    const QRect note = noteRect();
-    const QPointF c(note.right() - 42, note.bottom() - 14);   // 兔头中心
-    const double r = 18;
-
-    const QColor face(0xFF, 0xFD, 0xF8);
-    const QColor pink(0xF8, 0xC8, 0xD0);
-    const QPen linePen(kLineBrown, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-
-    // 长耳朵（在头后面，微微外撇）
-    auto drawEar = [&](qreal cx, qreal cy, qreal angle) {
-        p.save();
-        p.translate(cx, cy);
-        p.rotate(angle);
-        p.setPen(linePen);
-        p.setBrush(face);
-        p.drawEllipse(QRectF(-3.5, -24, 7, 24));        // 长 24 宽 7
-        p.setPen(Qt::NoPen);
-        p.setBrush(pink);
-        p.drawEllipse(QRectF(-1.6, -20, 3.2, 16));      // 内耳
-        p.restore();
-    };
-    drawEar(c.x() - 7, c.y() - 13, -10);
-    drawEar(c.x() + 7, c.y() - 13, 10);
-
-    // 头
-    p.setPen(linePen);
-    p.setBrush(face);
-    p.drawEllipse(c, r, r);
-
-    // 眼睛：平时圆点，眨眼时弯月
-    p.setPen(linePen);
-    if (m_blink) {
-        p.setBrush(Qt::NoBrush);
-        p.drawArc(QRectF(c.x() - 11, c.y() - 6, 8, 7), 200 * 16, 140 * 16);
-        p.drawArc(QRectF(c.x() + 3,  c.y() - 6, 8, 7), 200 * 16, 140 * 16);
-    } else {
-        p.setBrush(kLineBrown);
-        p.drawEllipse(QPointF(c.x() - 7, c.y() - 2), 2.0, 2.4);
-        p.drawEllipse(QPointF(c.x() + 7, c.y() - 2), 2.0, 2.4);
-    }
-
-    // 小粉鼻
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(0xF8, 0xA5, 0xB8));
-    p.drawEllipse(QPointF(c.x(), c.y() + 1.5), 1.8, 1.4);
-
-    // 嘴（小 w）
-    p.setPen(linePen);
-    p.setBrush(Qt::NoBrush);
-    p.drawArc(QRectF(c.x() - 4.5, c.y() + 3, 4.5, 4), 200 * 16, 140 * 16);
-    p.drawArc(QRectF(c.x(),      c.y() + 3, 4.5, 4), 200 * 16, 140 * 16);
-
-    // 腮红
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(0xF8, 0xA5, 0xB8, 150));
-    p.drawEllipse(QPointF(c.x() - 12.5, c.y() + 5), 3.2, 2.4);
-    p.drawEllipse(QPointF(c.x() + 12.5, c.y() + 5), 3.2, 2.4);
-
-    // 爪子搭在纸张下缘
-    p.setPen(linePen);
-    p.setBrush(face);
-    p.drawEllipse(QPointF(c.x() - 11, note.bottom() - 2), 5.5, 4);
-    p.drawEllipse(QPointF(c.x() + 11, note.bottom() - 2), 5.5, 4);
-}
-
-void DesktopWidget::drawShiba(QPainter &p)
-{
-    const QRect note = noteRect();
-    const QPointF c(note.right() - 42, note.bottom() - 14);   // 柴犬头中心
-    const double r = 18;
-
-    const QColor fur(0xF6, 0xC1, 0x77);      // 暖橙
-    const QColor cream(0xFF, 0xFD, 0xF8);
-    const QPen linePen(kLineBrown, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-
-    // 三角耳（在头后面）
-    p.setPen(linePen);
-    p.setBrush(fur);
-    QPainterPath earL, earR;
-    earL.moveTo(c.x() - 15, c.y() - 8);  earL.lineTo(c.x() - 17, c.y() - 24); earL.lineTo(c.x() - 4, c.y() - 15); earL.closeSubpath();
-    earR.moveTo(c.x() + 15, c.y() - 8);  earR.lineTo(c.x() + 17, c.y() - 24); earR.lineTo(c.x() + 4, c.y() - 15); earR.closeSubpath();
-    p.drawPath(earL);
-    p.drawPath(earR);
-
-    // 内耳
-    p.setPen(Qt::NoPen);
-    p.setBrush(cream);
-    QPainterPath innerL, innerR;
-    innerL.moveTo(c.x() - 13, c.y() - 11); innerL.lineTo(c.x() - 14.5, c.y() - 19); innerL.lineTo(c.x() - 7, c.y() - 14); innerL.closeSubpath();
-    innerR.moveTo(c.x() + 13, c.y() - 11); innerR.lineTo(c.x() + 14.5, c.y() - 19); innerR.lineTo(c.x() + 7, c.y() - 14); innerR.closeSubpath();
-    p.drawPath(innerL);
-    p.drawPath(innerR);
-
-    // 头
-    p.setPen(linePen);
-    p.setBrush(fur);
-    p.drawEllipse(c, r, r);
-
-    // 白色口鼻区域（脸下半部分）
-    p.setPen(Qt::NoPen);
-    p.setBrush(cream);
-    p.drawEllipse(QPointF(c.x(), c.y() + 7), 10.5, 8);
-
-    // 眼睛：平时圆点，眨眼时弯月
-    p.setPen(linePen);
-    if (m_blink) {
-        p.setBrush(Qt::NoBrush);
-        p.drawArc(QRectF(c.x() - 11, c.y() - 6, 8, 7), 200 * 16, 140 * 16);
-        p.drawArc(QRectF(c.x() + 3,  c.y() - 6, 8, 7), 200 * 16, 140 * 16);
-    } else {
-        p.setBrush(kLineBrown);
-        p.drawEllipse(QPointF(c.x() - 7, c.y() - 2), 2.0, 2.4);
-        p.drawEllipse(QPointF(c.x() + 7, c.y() - 2), 2.0, 2.4);
-    }
-
-    // 小黑鼻
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(0x40, 0x2E, 0x28));
-    p.drawEllipse(QPointF(c.x(), c.y() + 3), 2.2, 1.8);
-
-    // 嘴（小 w）
-    p.setPen(linePen);
-    p.setBrush(Qt::NoBrush);
-    p.drawArc(QRectF(c.x() - 4.5, c.y() + 4.5, 4.5, 4), 200 * 16, 140 * 16);
-    p.drawArc(QRectF(c.x(),      c.y() + 4.5, 4.5, 4), 200 * 16, 140 * 16);
-
-    // 腮红
-    p.setPen(Qt::NoPen);
-    p.setBrush(QColor(0xF8, 0xA5, 0xB8, 150));
-    p.drawEllipse(QPointF(c.x() - 12.5, c.y() + 3), 3.2, 2.4);
-    p.drawEllipse(QPointF(c.x() + 12.5, c.y() + 3), 3.2, 2.4);
-
-    // 白色爪子搭在纸张下缘
-    p.setPen(linePen);
-    p.setBrush(cream);
-    p.drawEllipse(QPointF(c.x() - 11, note.bottom() - 2), 5.5, 4);
-    p.drawEllipse(QPointF(c.x() + 11, note.bottom() - 2), 5.5, 4);
-}
-
-void DesktopWidget::drawProgressRing(QPainter &p)
-{
-    // 进度 = 所有文件夹中已完成事项数 / 总事项数
-    int total = 0, done = 0;
-    for (const TodoFolder &folder : m_folders) {
-        for (const TodoItem &item : folder.getItems()) {
-            ++total;
-            if (item.isCompleted()) ++done;
+    const QPointF mousePos = mapFromGlobal(QCursor::pos());
+    const int n = m_particles.size();
+    for (int i = 0; i < n; ++i) {
+        const NoteParticle &a = m_particles[i];
+        for (int j = i + 1; j < n; ++j) {
+            const NoteParticle &b = m_particles[j];
+            const qreal dx = a.x - b.x;
+            const qreal dy = a.y - b.y;
+            const qreal d2 = dx * dx + dy * dy;
+            if (d2 > 70.0 * 70.0) continue;
+            const qreal closeness = 1.0 - std::sqrt(d2) / 70.0;
+            QColor c = (a.colorIdx % 2 == 0) ? Theme::primary() : Theme::accent();
+            c.setAlpha(static_cast<int>(60 * closeness * closeness));
+            p.setPen(QPen(c, 1));
+            p.drawLine(QPointF(a.x, a.y), QPointF(b.x, b.y));
         }
-    }
-    if (total == 0) return;
-
-    const QRect note = noteRect();
-    const QPointF c(note.left() + 14, note.bottom() - 14);   // 圆环中心（左下角，与猫咪呼应）
-    const qreal outer = 30.0;                                // 外径
-    const qreal penW = 4.0;
-    const qreal r = (outer - penW) / 2.0;
-    const qreal ratio = qreal(done) / qreal(total);
-
-    p.save();
-    p.setRenderHint(QPainter::Antialiasing);
-
-    // 底环
-    QColor base = kLineBrown;
-    base.setAlphaF(0.2);
-    p.setPen(QPen(base, penW));
-    p.setBrush(Qt::NoBrush);
-    p.drawEllipse(c, r, r);
-
-    // 进度弧（12 点方向顺时针）
-    p.setPen(QPen(accentColor(), penW, Qt::SolidLine, Qt::RoundCap));
-    p.drawArc(QRectF(c.x() - r, c.y() - r, r * 2, r * 2), 90 * 16, -qRound(ratio * 360 * 16));
-
-    // 中心百分比
-    QFont f(QStringLiteral("Microsoft YaHei UI"), -1);
-    f.setPixelSize(10);
-    f.setWeight(QFont::DemiBold);
-    p.setFont(f);
-    p.setPen(kTextWarm);
-    p.drawText(QRectF(c.x() - outer / 2, c.y() - outer / 2, outer, outer),
-               Qt::AlignCenter, QStringLiteral("%1%").arg(qRound(ratio * 100)));
-
-    // 全部完成：在猫咪周围撒彩带庆祝
-    if (done == total) {
-        auto *rng = QRandomGenerator::global();
-        const QPointF catC(note.right() - 42, note.bottom() - 24);
-        const QList<QColor> palette = {
-            accentColor(),
-            QColor(0xF6, 0xA5, 0xC0),   // 粉
-            QColor(0x42, 0xA5, 0xF5),   // 蓝
-            QColor(0xFF, 0xD5, 0x4F)    // 暖黄
-        };
-        const int pieces = 6 + rng->bounded(3);   // 6-8 片
-        for (int i = 0; i < pieces; ++i) {
-            const double ang = rng->generateDouble() * 2 * M_PI;
-            const double dist = 20 + rng->generateDouble() * 14;
-            p.save();
-            p.translate(catC.x() + dist * std::cos(ang), catC.y() + dist * std::sin(ang));
-            p.rotate(rng->generateDouble() * 360.0);
-            p.setPen(Qt::NoPen);
-            p.setBrush(palette.at(rng->bounded(static_cast<int>(palette.size()))));
-            if (rng->bounded(2) == 0) {
-                p.drawRect(QRectF(-2.5, -2.5, 5, 5));   // 小方块
-            } else {
-                QPainterPath tri;                        // 小三角
-                tri.moveTo(0, -3.4);
-                tri.lineTo(3.0, 2.4);
-                tri.lineTo(-3.0, 2.4);
-                tri.closeSubpath();
-                p.drawPath(tri);
+        // 鼠标牵引线
+        if (note.contains(mousePos.toPoint())) {
+            const qreal dx = a.x - mousePos.x();
+            const qreal dy = a.y - mousePos.y();
+            const qreal d2 = dx * dx + dy * dy;
+            if (d2 < 110.0 * 110.0) {
+                const qreal closeness = 1.0 - std::sqrt(d2) / 110.0;
+                QColor c = Theme::primary();
+                c.setAlpha(static_cast<int>(120 * closeness * closeness));
+                p.setPen(QPen(c, 1));
+                p.drawLine(QPointF(a.x, a.y), mousePos);
             }
-            p.restore();
         }
     }
-
+    for (const NoteParticle &pt : m_particles) {
+        QColor c = (pt.colorIdx % 3 == 0) ? Theme::neonPink()
+                 : (pt.colorIdx % 2 == 0) ? Theme::primary() : Theme::accent();
+        c.setAlpha(170);
+        p.setPen(Qt::NoPen);
+        p.setBrush(c);
+        p.drawEllipse(QPointF(pt.x, pt.y), pt.size, pt.size);
+    }
     p.restore();
-}
 
-void DesktopWidget::scheduleBlink()
-{
-    const int interval = 2400 + QRandomGenerator::global()->bounded(3200);
-    QTimer::singleShot(interval, this, [this]() {
-        m_blink = true;
-        update();
-        QTimer::singleShot(180, this, [this]() {
-            m_blink = false;
-            update();
-            scheduleBlink();
-        });
-    });
+    // 玻璃描边 + 顶部高光
+    p.setPen(QPen(Theme::glassBorder(), 1));
+    p.setBrush(Qt::NoBrush);
+    p.drawRoundedRect(QRectF(note).adjusted(0.5, 0.5, -0.5, -0.5), 14, 14);
+    p.setPen(QPen(Theme::glassHighlight(), 1));
+    p.drawLine(note.left() + 16, note.top() + 1, note.right() - 16, note.top() + 1);
+
+    // 顶部霓虹渐变细边
+    QLinearGradient edgeGrad(note.topLeft(), note.topRight());
+    QColor c1 = Theme::primary(), c2 = Theme::accent();
+    c1.setAlpha(110); c2.setAlpha(110);
+    edgeGrad.setColorAt(0, c1);
+    edgeGrad.setColorAt(0.5, c2);
+    edgeGrad.setColorAt(1, QColor(c1.red(), c1.green(), c1.blue(), 0));
+    p.setPen(QPen(QBrush(edgeGrad), 2));
+    p.drawLine(note.left() + 14, note.top() + 2, note.right() - 14, note.top() + 2);
 }
 
 // ==========================================================
@@ -1007,19 +804,19 @@ void DesktopWidget::drawWeather(QPainter &p)
 
     p.save();
 
-    // 小贴纸底（半透明白纸）
-    p.setPen(QPen(QColor(accentColor().red(), accentColor().green(), accentColor().blue(), 70), 1));
-    p.setBrush(QColor(255, 255, 255, 150));
+    // 玻璃贴片底
+    p.setPen(QPen(Theme::glassBorder(), 1));
+    p.setBrush(Theme::glassBgStrong());
     p.drawRoundedRect(r, 12, 12);
 
-    // 手绘天气图标
+    // 天气图标（霓虹配色）
     const QRectF iconBox(r.left() + 7, r.center().y() - 7.5, 15, 15);
-    const QPen linePen(kLineBrown, 1.4, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
     const int kind = (m_weatherCode < 0) ? WSun : weatherKind(m_weatherCode);
+    const QColor cloudColor(0xC9, 0xD6, 0xE8);
 
     auto drawSun = [&](const QRectF &b) {
-        p.setPen(QPen(accentColor(), 1.6, Qt::SolidLine, Qt::RoundCap));
-        p.setBrush(QColor(accentColor().red(), accentColor().green(), accentColor().blue(), 90));
+        p.setPen(QPen(Theme::warning(), 1.6, Qt::SolidLine, Qt::RoundCap));
+        p.setBrush(Theme::withAlpha(Theme::warning(), 90));
         p.drawEllipse(b.adjusted(3, 3, -3, -3));
         for (int i = 0; i < 8; ++i) {
             const double a = i * M_PI / 4;
@@ -1030,14 +827,14 @@ void DesktopWidget::drawWeather(QPainter &p)
         }
     };
     auto drawCloud = [&](const QRectF &b) {
-        p.setPen(linePen);
-        p.setBrush(QColor(0xFF, 0xFD, 0xF8));
+        p.setPen(QPen(cloudColor, 1.4, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        p.setBrush(Theme::withAlpha(cloudColor, 60));
         p.drawPath(cloudPath(b));
     };
 
     if (m_weatherLoading) {
         // 加载中：旋转小圆弧
-        p.setPen(QPen(kTextSoft, 1.6, Qt::SolidLine, Qt::RoundCap));
+        p.setPen(QPen(Theme::primary(), 1.6, Qt::SolidLine, Qt::RoundCap));
         p.setBrush(Qt::NoBrush);
         p.drawArc(iconBox, 45 * 16, 240 * 16);
     } else if (kind == WSun) {
@@ -1056,10 +853,10 @@ void DesktopWidget::drawWeather(QPainter &p)
             bolt.lineTo(iconBox.center().x() + 0.5, iconBox.bottom() - 2);
             bolt.lineTo(iconBox.center().x() - 2, iconBox.bottom() + 2);
             p.setPen(Qt::NoPen);
-            p.setBrush(accentColor());
+            p.setBrush(Theme::accent());
             p.drawPath(bolt);
         } else {
-            p.setPen(QPen(QColor(0x42, 0xA5, 0xF5), 1.5, Qt::SolidLine, Qt::RoundCap));
+            p.setPen(QPen(Theme::primary(), 1.5, Qt::SolidLine, Qt::RoundCap));
             for (int i = 0; i < 3; ++i) {
                 const qreal x = iconBox.left() + 4 + i * 4.5;
                 p.drawLine(QPointF(x, iconBox.bottom() - 5), QPointF(x - 1.5, iconBox.bottom() - 1));
@@ -1067,7 +864,7 @@ void DesktopWidget::drawWeather(QPainter &p)
         }
     } else if (kind == WSnow) {
         drawCloud(QRectF(iconBox.left(), iconBox.top(), iconBox.width(), iconBox.height() - 5));
-        p.setPen(QPen(QColor(0x64, 0xB5, 0xF6), 1.3, Qt::SolidLine, Qt::RoundCap));
+        p.setPen(QPen(QColor(0x67, 0xE8, 0xF9), 1.3, Qt::SolidLine, Qt::RoundCap));
         for (int i = 0; i < 2; ++i) {
             const QPointF c(iconBox.left() + 5 + i * 7, iconBox.bottom() - 2);
             p.drawLine(c + QPointF(-2, 0), c + QPointF(2, 0));
@@ -1075,7 +872,7 @@ void DesktopWidget::drawWeather(QPainter &p)
         }
     } else { // WFog
         drawCloud(QRectF(iconBox.left(), iconBox.top(), iconBox.width(), iconBox.height() - 6));
-        p.setPen(QPen(kTextSoft, 1.3, Qt::SolidLine, Qt::RoundCap));
+        p.setPen(QPen(Theme::textMuted(), 1.3, Qt::SolidLine, Qt::RoundCap));
         p.drawLine(QPointF(iconBox.left() + 2, iconBox.bottom() - 3), QPointF(iconBox.right() - 4, iconBox.bottom() - 3));
         p.drawLine(QPointF(iconBox.left() + 5, iconBox.bottom()), QPointF(iconBox.right() - 1, iconBox.bottom()));
     }
@@ -1085,7 +882,7 @@ void DesktopWidget::drawWeather(QPainter &p)
     f.setPixelSize(12);
     f.setWeight(QFont::DemiBold);
     p.setFont(f);
-    p.setPen(kTextWarm);
+    p.setPen(Theme::textPrimary());
     QFontMetrics fm(f);
     const int textX = r.left() + 26;
     p.drawText(QRect(textX, r.top(), r.right() - 6 - textX, r.height()),
@@ -1215,7 +1012,7 @@ void DesktopWidget::mouseReleaseEvent(QMouseEvent *event)
 
 void DesktopWidget::mouseDoubleClickEvent(QMouseEvent *event)
 {
-    // 双击空白：聚焦快速添加（小黄条式"点一下就写"）
+    // 双击空白：聚焦快速添加
     if (event->button() == Qt::LeftButton) {
         m_addLineEdit->setFocus();
     }
@@ -1283,11 +1080,14 @@ void DesktopWidget::contextMenuEvent(QContextMenuEvent *event)
 {
     QMenu menu(this);
     menu.setStyleSheet(QStringLiteral(
-        "QMenu { background-color: #fffdf6; border: 1px solid #e8dcc8; border-radius: 8px; padding: 4px; }"
-        "QMenu::item { padding: 7px 24px; border-radius: 4px; color: #5d4037; }"
-        "QMenu::item:selected { background-color: %1; color: #5d4037; }"
+        "QMenu { background-color: rgba(20, 24, 42, 245); border: 1px solid %1;"
+        "        border-radius: 8px; padding: 4px; }"
+        "QMenu::item { padding: 7px 24px; border-radius: 4px; color: %2; }"
+        "QMenu::item:selected { background-color: %3; }"
         "QMenu::item:checked { font-weight: 600; }")
-        .arg(QColor(accentColor().red(), accentColor().green(), accentColor().blue(), 50).name(QColor::HexArgb)));
+        .arg(Theme::glassBorder().name(QColor::HexArgb),
+             Theme::textPrimary().name(),
+             Theme::hoverGlow().name(QColor::HexArgb)));
 
     // 命中待办项：完成/编辑/删除
     QListWidgetItem *hit = m_todoListWidget->itemAt(m_todoListWidget->mapFromParent(event->pos()));
@@ -1300,25 +1100,6 @@ void DesktopWidget::contextMenuEvent(QContextMenuEvent *event)
         menu.addAction(QStringLiteral("编辑"), this, [this, itemId]() { emit editTodoRequested(itemId); });
         menu.addAction(QStringLiteral("删除"), this, [this, itemId]() { emit deleteTodoRequested(itemId); });
         menu.addSeparator();
-    }
-
-    // 纸张颜色
-    QMenu *themeMenu = menu.addMenu(QStringLiteral("纸张颜色"));
-    const QStringList names = {QStringLiteral("柠檬黄"), QStringLiteral("樱花粉"),
-                               QStringLiteral("薄荷绿"), QStringLiteral("天空蓝"), QStringLiteral("奶油白")};
-    for (int i = 0; i < names.size(); ++i) {
-        QAction *a = themeMenu->addAction(names[i], this, [this, i]() { setPaperTheme(static_cast<PaperTheme>(i)); });
-        a->setCheckable(true);
-        a->setChecked(static_cast<int>(m_theme) == i);
-    }
-
-    // 小伙伴
-    QMenu *charMenu = menu.addMenu(QStringLiteral("小伙伴"));
-    const QStringList charNames = {QStringLiteral("猫咪"), QStringLiteral("兔子"), QStringLiteral("柴犬")};
-    for (int i = 0; i < charNames.size(); ++i) {
-        QAction *a = charMenu->addAction(charNames[i], this, [this, i]() { setCharacter(static_cast<Character>(i)); });
-        a->setCheckable(true);
-        a->setChecked(static_cast<int>(m_character) == i);
     }
 
     // 透明度
@@ -1411,8 +1192,6 @@ void DesktopWidget::loadWindowSize()
 void DesktopWidget::saveAppearance()
 {
     QSettings settings;
-    settings.setValue(QStringLiteral("DesktopWidget/theme"), static_cast<int>(m_theme));
-    settings.setValue(QStringLiteral("DesktopWidget/character"), static_cast<int>(m_character));
     settings.setValue(QStringLiteral("DesktopWidget/opacity"), windowOpacity());
     settings.setValue(QStringLiteral("DesktopWidget/onTop"), m_alwaysOnTop);
     settings.setValue(QStringLiteral("DesktopWidget/weatherCity"), m_weatherCity);
@@ -1421,8 +1200,6 @@ void DesktopWidget::saveAppearance()
 void DesktopWidget::loadAppearance()
 {
     QSettings settings;
-    m_theme = static_cast<PaperTheme>(qBound(0, settings.value(QStringLiteral("DesktopWidget/theme"), 0).toInt(), 4));
-    m_character = static_cast<Character>(qBound(0, settings.value(QStringLiteral("DesktopWidget/character"), 0).toInt(), 2));
     const qreal opacity = qBound(0.3, settings.value(QStringLiteral("DesktopWidget/opacity"), 1.0).toReal(), 1.0);
     m_alwaysOnTop = settings.value(QStringLiteral("DesktopWidget/onTop"), true).toBool();
     m_weatherCity = settings.value(QStringLiteral("DesktopWidget/weatherCity"), QStringLiteral("北京")).toString();

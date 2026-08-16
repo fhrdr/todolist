@@ -10,6 +10,9 @@
 #include <QLineEdit>
 #include <QTimer>
 #include <QPoint>
+#include <QSize>
+#include <QVector>
+#include <QElapsedTimer>
 #include "todoitem.h"
 #include "todofolder.h"
 
@@ -17,8 +20,8 @@ class QPainter;
 class QNetworkAccessManager;
 class QNetworkReply;
 
-// 桌面便利贴（仿小黄条风格）：
-// 便利贴纸张 + 和纸胶带 + 卡通猫 + 手绘复选框 + 换肤/透明度/置顶
+// 桌面便利贴（暗夜霓虹玻璃风）：
+// 半透明深色玻璃纸 + 内部流动光斑 + 霓虹进度条 + 天气贴片 + 透明度/置顶
 class DesktopWidget : public QWidget
 {
     Q_OBJECT
@@ -29,9 +32,6 @@ public:
 
     void updateTodoData(const QList<TodoFolder> &folders);
     void refreshDisplay();
-
-    enum PaperTheme { Lemon = 0, Sakura, Mint, Sky, Cream };
-    enum Character { CharCat = 0, CharRabbit, CharShiba };
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -66,25 +66,12 @@ private:
 
     // ---- 外观 ----
     void applyTheme();
-    void setPaperTheme(PaperTheme theme);
-    void setCharacter(Character character);
     void setNoteOpacity(qreal opacity);
     void setAlwaysOnTop(bool onTop);
-    QColor paperTop() const;
-    QColor paperBottom() const;
-    QColor accentColor() const;
 
     // ---- 绘制 ----
     QRect noteRect() const;
-    void drawPaper(QPainter &p);
-    void drawTape(QPainter &p);
-    void drawStarSticker(QPainter &p);
-    void drawCharacter(QPainter &p);
-    void drawCat(QPainter &p);
-    void drawRabbit(QPainter &p);
-    void drawShiba(QPainter &p);
-    void drawProgressRing(QPainter &p);
-    void scheduleBlink();
+    void drawNote(QPainter &p);
 
     // ---- 天气贴片 ----
     QRect weatherRect() const;
@@ -112,18 +99,26 @@ private:
     QPushButton *m_pinButton;
     QListWidget *m_todoListWidget;
     QLineEdit *m_addLineEdit;
+    QWidget *m_progressBar;
 
     // ---- 数据 ----
     QList<TodoFolder> m_folders;
     QList<TodoItem> m_displayItems;
     int m_quoteOffset = 0;
-    bool m_dueUrgent = false;
 
     // ---- 外观状态 ----
-    PaperTheme m_theme = Lemon;
-    Character m_character = CharCat;
     bool m_alwaysOnTop = true;
-    bool m_blink = false;
+
+    // ---- 光斑动画 ----
+    struct NoteParticle { qreal x, y, vx, vy, size; int colorIdx; };
+    void initNoteParticles();
+    void advanceNoteParticles(qreal dt);
+
+    QElapsedTimer m_clock;
+    QTimer *m_animTimer = nullptr;
+    QVector<NoteParticle> m_particles;
+    qint64 m_lastTick = 0;
+    QSize m_particleArea;           // 粒子初始化时的区域尺寸（变化则重建）
 
     // ---- 天气状态 ----
     QNetworkAccessManager *m_netManager = nullptr;

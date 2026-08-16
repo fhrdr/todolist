@@ -23,18 +23,21 @@ class TagCloudItem : public QWidget
 public:
     explicit TagCloudItem(const QString &tag, int count, QWidget *parent = nullptr);
     QString getTag() const { return m_tag; }
-    
+
 signals:
     void clicked(const QString &tag);
-    
+
 protected:
     void mousePressEvent(QMouseEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
-    
+    void enterEvent(QEnterEvent *event) override;
+    void leaveEvent(QEvent *event) override;
+
 private:
     QString m_tag;
     int m_count;
     QColor m_bgColor;
+    bool m_hovered = false;
 };
 
 class TagListItem : public QWidget
@@ -44,20 +47,23 @@ class TagListItem : public QWidget
 public:
     explicit TagListItem(const QString &tag, int count, QWidget *parent = nullptr);
     QString getTag() const { return m_tag; }
-    
+
 signals:
     void clicked(const QString &tag);
     void deleteRequested(const QString &tag);
-    
+
 protected:
     void mousePressEvent(QMouseEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
-    
+    void enterEvent(QEnterEvent *event) override;
+    void leaveEvent(QEvent *event) override;
+
 private:
     QString m_tag;
     int m_count;
     QRect m_deleteRect;
     QColor m_bgColor;
+    bool m_hovered = false;
 };
 
 class TodoItemWidget : public QWidget

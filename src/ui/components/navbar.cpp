@@ -2,11 +2,12 @@
 #include "../theme.h"
 
 #include <QPainter>
+#include <QPainterPath>
 #include <QFontMetrics>
 #include <QHBoxLayout>
 #include <QMouseEvent>
+#include <QEnterEvent>
 #include <QEasingCurve>
-#include <QGraphicsOpacityEffect>
 
 NavBar::NavBar(const QString &appName, const QStringList &items, QWidget *parent)
     : QWidget(parent)
@@ -16,13 +17,10 @@ NavBar::NavBar(const QString &appName, const QStringList &items, QWidget *parent
     setFixedHeight(64);
     setMouseTracking(true);
     setCursor(Qt::ArrowCursor);
-
-    m_indicator = new QWidget(this);
-    m_indicator->setFixedHeight(4);
-    m_indicator->setStyleSheet(QStringLiteral("background-color: %1; border-radius: 2px;")
-                               .arg(Theme::primary().name()));
+    setAttribute(Qt::WA_TranslucentBackground);
 
     m_rightContainer = new QWidget(this);
+    m_rightContainer->setStyleSheet(QStringLiteral("background: transparent;"));
     m_rightLayout = new QHBoxLayout(m_rightContainer);
     m_rightLayout->setContentsMargins(0, 0, 20, 0);
     m_rightLayout->setSpacing(8);
@@ -56,6 +54,12 @@ QRect NavBar::itemRect(int index) const
     return QRect(x, 0, widths.value(index, 0), height());
 }
 
+QRectF NavBar::capsuleRect(int index) const
+{
+    // 选中胶囊：包裹文字，垂直居中，上下留 10px
+    return QRectF(itemRect(index)).adjusted(10, 10, -10, -10);
+}
+
 void NavBar::setCurrentIndex(int index)
 {
     if (index < 0 || index >= m_items.size() || index == m_currentIndex) {
@@ -63,33 +67,37 @@ void NavBar::setCurrentIndex(int index)
     }
     m_currentIndex = index;
     moveIndicator(index, true);
-    fadeToPage(index);
+    slideToPage(index);
     emit pageSelected(index);
     update();
 }
 
 void NavBar::moveIndicator(int index, bool animated)
 {
-    QRect r = itemRect(index);
-    int iw = r.width() - 36;
-    QRect target(r.center().x() - iw / 2, height() - 12, iw, 4);
+    const QRectF target = capsuleRect(index);
 
     if (animated) {
-        if (!m_indicatorAnim) {
-            m_indicatorAnim = new QPropertyAnimation(m_indicator, "geometry", this);
-            m_indicatorAnim->setEasingCurve(QEasingCurve::OutCubic);
+        if (!m_indAnim) {
+            m_indAnim = new QVariantAnimation(this);
+            m_indAnim->setEasingCurve(QEasingCurve::OutCubic);
+            connect(m_indAnim, &QVariantAnimation::valueChanged, this, [this](const QVariant &v) {
+                m_indRect = v.toRectF();
+                update();
+            });
         }
-        m_indicatorAnim->stop();
-        m_indicatorAnim->setDuration(320);
-        m_indicatorAnim->setStartValue(m_indicator->geometry());
-        m_indicatorAnim->setEndValue(target);
-        m_indicatorAnim->start();
+        m_indAnim->stop();
+        m_indAnim->setDuration(300);
+        m_indAnim->setStartValue(m_indRect.isValid() ? m_indRect : target);
+        m_indAnim->setEndValue(target);
+        m_indAnim->start();
     } else {
-        m_indicator->setGeometry(target);
+        if (m_indAnim) m_indAnim->stop();
+        m_indRect = target;
+        update();
     }
 }
 
-void NavBar::fadeToPage(int index)
+void NavBar::slideToPage(int index)
 {
     if (!m_stack || index >= m_stack->count()) {
         return;
@@ -99,18 +107,15 @@ void NavBar::fadeToPage(int index)
     if (!page) {
         return;
     }
-    auto *effect = new QGraphicsOpacityEffect(page);
-    page->setGraphicsEffect(effect);
-    auto *anim = new QPropertyAnimation(effect, "opacity", page);
-    anim->setDuration(280);
-    anim->setStartValue(0.0);
-    anim->setEndValue(1.0);
-    anim->setEasingCurve(QEasingCurve::OutCubic);
-    anim->start(QAbstractAnimation::DeleteWhenStopped);
-    // 动画结束后移除 effect，避免长期占用
-    QObject::connect(anim, &QPropertyAnimation::finished, page, [page]() {
-        page->setGraphicsEffect(nullptr);
-    });
+
+    // 仅保留轻量上滑进入：不做整页透明度栅格化（切换卡顿/高功耗的主要来源）
+    const QPoint endPos = page->pos();
+    auto *slide = new QPropertyAnimation(page, "pos", page);
+    slide->setDuration(260);
+    slide->setStartValue(endPos + QPoint(0, 14));
+    slide->setEndValue(endPos);
+    slide->setEasingCurve(QEasingCurve::OutCubic);
+    slide->start(QAbstractAnimation::DeleteWhenStopped);
 }
 
 void NavBar::resizeEvent(QResizeEvent *event)
@@ -133,15 +138,43 @@ void NavBar::mousePressEvent(QMouseEvent *event)
     QWidget::mousePressEvent(event);
 }
 
+void NavBar::mouseMoveEvent(QMouseEvent *event)
+{
+    int hover = -1;
+    for (int i = 0; i < m_items.size(); ++i) {
+        if (itemRect(i).contains(event->pos())) {
+            hover = i;
+            break;
+        }
+    }
+    if (hover != m_hoveredIndex) {
+        m_hoveredIndex = hover;
+        setCursor(hover >= 0 ? Qt::PointingHandCursor : Qt::ArrowCursor);
+        update();
+    }
+    QWidget::mouseMoveEvent(event);
+}
+
+void NavBar::leaveEvent(QEvent *event)
+{
+    if (m_hoveredIndex != -1) {
+        m_hoveredIndex = -1;
+        setCursor(Qt::ArrowCursor);
+        update();
+    }
+    QWidget::leaveEvent(event);
+}
+
 void NavBar::paintEvent(QPaintEvent *event)
 {
     Q_UNUSED(event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
 
-    // 背景
-    painter.fillRect(rect(), Theme::surface());
-    painter.setPen(Theme::border());
+    // 玻璃底（透出极光背景）
+    QColor bg = Theme::isDark() ? QColor(0x0B, 0x0E, 0x1A, 130) : QColor(255, 255, 255, 150);
+    painter.fillRect(rect(), bg);
+    painter.setPen(Theme::glassBorder());
     painter.drawLine(rect().bottomLeft(), rect().bottomRight());
 
     // 左侧应用名（为空时跳过，避免与标题栏重复）
@@ -151,15 +184,136 @@ void NavBar::paintEvent(QPaintEvent *event)
         painter.drawText(QRect(24, 0, 260, height()), Qt::AlignLeft | Qt::AlignVCenter, m_appName);
     }
 
+    // 选中胶囊：半透明主题色底 + 霓虹渐变描边（先画，垫在文字下）
+    if (m_indRect.isValid()) {
+        const qreal radius = m_indRect.height() / 2.0;
+
+        // 外侧柔光
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(Theme::withAlpha(Theme::primary(), Theme::isDark() ? 18 : 12));
+        painter.drawRoundedRect(m_indRect.adjusted(-2, -2, 2, 2), radius + 2, radius + 2);
+
+        // 胶囊底
+        painter.setBrush(Theme::withAlpha(Theme::primary(), Theme::isDark() ? 34 : 24));
+        painter.drawRoundedRect(m_indRect, radius, radius);
+
+        // 渐变描边（青 -> 紫）
+        QLinearGradient borderGrad(m_indRect.topLeft(), m_indRect.topRight());
+        borderGrad.setColorAt(0, Theme::withAlpha(Theme::primary(), 220));
+        borderGrad.setColorAt(1, Theme::withAlpha(Theme::accent(), 220));
+        painter.setPen(QPen(QBrush(borderGrad), 1.2));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRoundedRect(m_indRect.adjusted(0.6, 0.6, -0.6, -0.6), radius - 0.6, radius - 0.6);
+    }
+
     // 导航项文字
-    QFontMetrics fm(Theme::font(Theme::fontMedium, QFont::Medium));
     for (int i = 0; i < m_items.size(); ++i) {
         QRect r = itemRect(i);
-        bool selected = (i == m_currentIndex);
+        const bool selected = (i == m_currentIndex);
+        const bool hovered  = (i == m_hoveredIndex);
+
+        // 悬停：文字后方光晕胶囊
+        if (hovered && !selected) {
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(Theme::hoverGlow());
+            painter.drawRoundedRect(QRectF(r).adjusted(10, 10, -10, -10),
+                                    (r.height() - 20) / 2.0, (r.height() - 20) / 2.0);
+        }
 
         QFont f = Theme::font(Theme::fontMedium, selected ? QFont::DemiBold : QFont::Medium);
         painter.setFont(f);
-        painter.setPen(selected ? Theme::primary() : Theme::textSecondary());
+
+        if (selected) {
+            // 霓虹渐变文字
+            QLinearGradient grad(r.topLeft(), r.bottomRight());
+            grad.setColorAt(0, Theme::primary());
+            grad.setColorAt(1, Theme::accent());
+            painter.setPen(QPen(QBrush(grad), 1));
+        } else {
+            painter.setPen(hovered ? Theme::textPrimary() : Theme::textSecondary());
+        }
         painter.drawText(r, Qt::AlignCenter, m_items[i]);
+    }
+}
+
+// ---------------- NavIconButton ----------------
+
+NavIconButton::NavIconButton(Icons::Type type, const QString &tooltip, QWidget *parent)
+    : QPushButton(parent)
+{
+    // ghost 变体仅用于清除 QSS 基础按钮样式干扰（min-width 等），视觉全部自绘
+    setProperty("variant", "ghost");
+    setFixedSize(36, 36);
+    setToolTip(tooltip);
+    setCursor(Qt::PointingHandCursor);
+    m_pmNormal = Icons::pixmap(type, 18, Theme::textSecondary());
+    m_pmHover  = Icons::pixmap(type, 18, Theme::primary());
+}
+
+void NavIconButton::animateTo(qreal target, int duration)
+{
+    if (!m_anim) {
+        m_anim = new QVariantAnimation(this);
+        m_anim->setEasingCurve(QEasingCurve::OutCubic);
+        connect(m_anim, &QVariantAnimation::valueChanged, this, [this](const QVariant &v) {
+            m_hover = v.toReal();
+            update();
+        });
+    }
+    m_anim->stop();
+    m_anim->setDuration(duration);
+    m_anim->setStartValue(m_hover);
+    m_anim->setEndValue(target);
+    m_anim->start();
+}
+
+void NavIconButton::enterEvent(QEnterEvent *event)
+{
+    animateTo(1.0, 160);
+    QPushButton::enterEvent(event);
+}
+
+void NavIconButton::leaveEvent(QEvent *event)
+{
+    animateTo(0.0, 240);
+    QPushButton::leaveEvent(event);
+}
+
+void NavIconButton::paintEvent(QPaintEvent *event)
+{
+    Q_UNUSED(event)
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing);
+
+    const QRectF r = QRectF(rect()).adjusted(1, 1, -1, -1);
+    const qreal radius = 10.0;
+
+    // 按下态：比悬停更深一档
+    const qreal intensity = isDown() ? qMin<qreal>(1.0, m_hover + 0.35) : m_hover;
+
+    if (intensity > 0.01) {
+        // 光晕底
+        QColor fill = Theme::primary();
+        fill.setAlpha(static_cast<int>((Theme::isDark() ? 34 : 26) * intensity));
+        p.setPen(Qt::NoPen);
+        p.setBrush(fill);
+        p.drawRoundedRect(r, radius, radius);
+
+        // 霓虹描边
+        QColor edge = Theme::primary();
+        edge.setAlpha(static_cast<int>(150 * intensity));
+        p.setPen(QPen(edge, 1.1));
+        p.setBrush(Qt::NoBrush);
+        p.drawRoundedRect(r.adjusted(0.55, 0.55, -0.55, -0.55), radius - 0.5, radius - 0.5);
+    }
+
+    // 图标：常态灰 -> 悬停主题色，按进度叠加
+    const QPoint pos((width() - m_pmNormal.width() / m_pmNormal.devicePixelRatio()) / 2,
+                     (height() - m_pmNormal.height() / m_pmNormal.devicePixelRatio()) / 2);
+    p.drawPixmap(pos, m_pmNormal);
+    if (intensity > 0.01) {
+        p.setOpacity(intensity);
+        p.drawPixmap(pos, m_pmHover);
+        p.setOpacity(1.0);
     }
 }

@@ -2,13 +2,17 @@
 #define NAVBAR_H
 
 #include <QWidget>
+#include <QPushButton>
 #include <QStringList>
 #include <QStackedWidget>
 #include <QPropertyAnimation>
+#include <QVariantAnimation>
+#include <QPixmap>
+#include "../icons.h"
 
 // 顶部导航栏：左侧应用标识，居中导航项（点击切换页面），
-// 选中项下方有主题色下划线，切换时下划线平滑滑动。
-// 配合 attachStack() 可实现页面淡入淡出切换。
+// 选中项为霓虹描边胶囊指示器，切换时胶囊平滑滑动。
+// 配合 attachStack() 可实现页面切换上滑动画。
 class NavBar : public QWidget
 {
     Q_OBJECT
@@ -19,7 +23,7 @@ public:
     void setCurrentIndex(int index);
     int currentIndex() const { return m_currentIndex; }
 
-    // 关联页面容器，切换时带淡入动画
+    // 关联页面容器，切换时带上滑动画
     void attachStack(QStackedWidget *stack);
 
     void addRightWidget(QWidget *w);
@@ -31,23 +35,48 @@ protected:
     void paintEvent(QPaintEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void leaveEvent(QEvent *event) override;
 
 private:
     QRect itemRect(int index) const;
+    QRectF capsuleRect(int index) const;
     void moveIndicator(int index, bool animated);
-    void fadeToPage(int index);
+    void slideToPage(int index);
 
     QString m_appName;
     QStringList m_items;
     int m_currentIndex = 0;
     int m_hoveredIndex = -1;
 
-    QWidget *m_indicator;
-    QPropertyAnimation *m_indicatorAnim = nullptr;
+    QRectF m_indRect;                       // 选中胶囊当前位置（动画驱动）
+    QVariantAnimation *m_indAnim = nullptr;
     QStackedWidget *m_stack = nullptr;
 
     QWidget *m_rightContainer;
     class QHBoxLayout *m_rightLayout;
+};
+
+// 导航栏图标按钮：悬停时霓虹光晕渐入 + 图标着色平滑过渡
+class NavIconButton : public QPushButton
+{
+    Q_OBJECT
+
+public:
+    explicit NavIconButton(Icons::Type type, const QString &tooltip, QWidget *parent = nullptr);
+
+protected:
+    void enterEvent(QEnterEvent *event) override;
+    void leaveEvent(QEvent *event) override;
+    void paintEvent(QPaintEvent *event) override;
+
+private:
+    void animateTo(qreal target, int duration);
+
+    QPixmap m_pmNormal;    // 常态图标（灰）
+    QPixmap m_pmHover;     // 悬停图标（主题色）
+    qreal m_hover = 0.0;
+    QVariantAnimation *m_anim = nullptr;
 };
 
 #endif // NAVBAR_H

@@ -69,16 +69,26 @@ void CalendarCell::paintEvent(QPaintEvent *event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     
-    QColor bgColor = m_selected ? Theme::primarySoft() : Theme::surface();
+    // 玻璃单元格：半透明底透出极光背景，选中项霓虹光晕
+    QColor bgColor = m_selected ? Theme::withAlpha(Theme::primary(), 46) : Theme::glassBg();
     if (m_otherMonth) {
-        bgColor = Theme::background();
+        bgColor = Theme::isDark() ? QColor(255, 255, 255, 4) : QColor(255, 255, 255, 110);
     }
-    painter.fillRect(rect(), bgColor);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(bgColor);
+    painter.drawRoundedRect(rect().adjusted(1, 1, -1, -1), 6, 6);
 
     if (m_selected) {
-        painter.setPen(QPen(Theme::primaryHover(), 2));
+        painter.setPen(QPen(Theme::primary(), 2));
         painter.setBrush(Qt::NoBrush);
         painter.drawRoundedRect(rect().adjusted(1, 1, -1, -1), 6, 6);
+    }
+
+    // 今天：日期下方一颗霓虹小点
+    if (m_today) {
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(Theme::primary());
+        painter.drawEllipse(QPointF(rect().center().x(), getDateRect().bottom() + 2), 2.5, 2.5);
     }
 
     QFont dateFont;
@@ -436,7 +446,9 @@ void TodoListItem::paintEvent(QPaintEvent *event)
     if (m_completed) {
         if (!m_tagColor.isEmpty()) {
             QColor baseColor(m_tagColor);
-            QColor lightColor = QColor(baseColor.red(), baseColor.green(), baseColor.blue(), 25);
+            // 完成项底色加深，避免暗色下几乎看不见
+            QColor lightColor = QColor(baseColor.red(), baseColor.green(), baseColor.blue(),
+                                       Theme::isDark() ? 55 : 25);
             QColor whiteColor = Theme::surface();
             QLinearGradient gradient(contentRect.left(), contentRect.top(),
                                      contentRect.right(), contentRect.top());
@@ -447,7 +459,7 @@ void TodoListItem::paintEvent(QPaintEvent *event)
             painter.drawRoundedRect(contentRect, 6, 6);
         } else {
             painter.setPen(Qt::NoPen);
-            painter.setBrush(Theme::surface());
+            painter.setBrush(Theme::isDark() ? Theme::glassBgStrong() : Theme::surface());
             painter.drawRoundedRect(contentRect, 6, 6);
         }
     } else {
@@ -480,21 +492,24 @@ void TodoListItem::paintEvent(QPaintEvent *event)
     if (!m_tagColor.isEmpty()) {
         tagColor = QColor(m_tagColor);
         if (m_completed) {
-            tagColor = QColor(tagColor.red(), tagColor.green(), tagColor.blue(), 100);
+            tagColor = QColor(tagColor.red(), tagColor.green(), tagColor.blue(),
+                              Theme::isDark() ? 170 : 100);
         }
     }
     if (m_completed && m_tagColor.isEmpty()) {
-        tagColor = Theme::textDisabled();
+        tagColor = Theme::textMuted();
     }
     painter.setBrush(tagColor);
     painter.setPen(Qt::NoPen);
     painter.drawRoundedRect(12, 10, 4, height() - 20, 2, 2);
 
+    // 完成项：次级文字色 + 删除线，既清晰可读又有"已完成"语义
     QFont titleFont;
     titleFont.setPixelSize(13);
     titleFont.setBold(!m_completed);
+    titleFont.setStrikeOut(m_completed);
     painter.setFont(titleFont);
-    painter.setPen(m_completed ? Theme::textDisabled() : Theme::textPrimary());
+    painter.setPen(m_completed ? Theme::textSecondary() : Theme::textPrimary());
     
     QFontMetrics fm(titleFont);
     QString elidedTitle = fm.elidedText(m_title, Qt::ElideRight, width() - 24);
@@ -607,7 +622,7 @@ void CalendarWidget::refreshTheme()
 {
     m_rightPanel->setStyleSheet(QStringLiteral(
         "background-color: %1; border: 1px solid %2; border-radius: 12px;")
-        .arg(Theme::surface().name(), Theme::border().name()));
+        .arg(Theme::glassBg().name(QColor::HexArgb), Theme::glassBorder().name(QColor::HexArgb)));
 
     m_dateLabel->setStyleSheet(QStringLiteral(
         "font-size: 14px; font-weight: 600; color: %1; border: none;")

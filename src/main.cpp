@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
 
     // 主题模式（浅色 / 深色），先于样式表加载
     QSettings settings;
-    Theme::setDark(settings.value(QStringLiteral("ui/darkMode"), false).toBool());
+    Theme::setDark(settings.value(QStringLiteral("ui/darkMode"), true).toBool());
 
     // 全局样式表（资源内嵌，与 Theme 设计令牌一致）
     QFile styleFile(Theme::isDark() ? QStringLiteral(":/styles-dark.qss")

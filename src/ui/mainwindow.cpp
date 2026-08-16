@@ -4,6 +4,7 @@
 #include "components/navbar.h"
 #include "components/sectionheader.h"
 #include "components/titlebar.h"
+#include "components/aurorabackground.h"
 #include "components/messageutils.h"
 #include "../core/databasemanager.h"
 
@@ -18,6 +19,7 @@
 #include <QStyledItemDelegate>
 #include <QPainter>
 #include <QPainterPath>
+#include <QLinearGradient>
 #include <QVariantAnimation>
 #include <QPropertyAnimation>
 #include <QGraphicsOpacityEffect>
@@ -132,21 +134,29 @@ public:
 
         QRect card = option.rect.adjusted(6, 3, -6, -3);
 
-        // 背景：选中/悬停
-        QColor bg = Theme::surface();
+        // 背景：玻璃质感，选中时透主题色光晕
+        QColor bg = Theme::glassBg();
         if (selected) {
-            bg = Theme::primarySoft();
+            bg = Theme::withAlpha(Theme::primary(), Theme::isDark() ? 38 : 30);
         } else if (hover > 0.0) {
-            bg = Theme::surface();
-            bg = QColor(Theme::surfaceAlt().red(), Theme::surfaceAlt().green(), Theme::surfaceAlt().blue(),
-                        static_cast<int>(255 * hover));
+            const QColor h = Theme::glassBgStrong();
+            const QColor base = Theme::glassBg();
+            bg = Theme::mix(base, h, hover);
         }
         painter->setPen(Qt::NoPen);
         painter->setBrush(bg);
         painter->drawRoundedRect(card, Theme::radiusMd, Theme::radiusMd);
 
-        // 选中左侧强调条
+        // 玻璃高光描边
+        painter->setBrush(Qt::NoBrush);
+        painter->setPen(QPen(Theme::withAlpha(Theme::glassHighlight(), selected ? 70 : 26), 1));
+        painter->drawRoundedRect(card.adjusted(0, 0, -1, -1), Theme::radiusMd, Theme::radiusMd);
+
+        // 选中左侧霓虹条（带发光）
         if (selected) {
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(Theme::withAlpha(Theme::primary(), 60));
+            painter->drawRoundedRect(card.left() - 1, card.top() + 6, 7, card.height() - 12, 3, 3);
             painter->setBrush(Theme::primary());
             painter->drawRoundedRect(card.left(), card.top() + 8, 4, card.height() - 16, 2, 2);
         }
@@ -154,7 +164,9 @@ public:
         int x = card.left() + 14;
         int cy = card.center().y();
 
-        // 文件夹色点
+        // 文件夹色点（外圈发光）
+        painter->setBrush(Theme::withAlpha(folderColor, 50));
+        painter->drawEllipse(x - 3, cy - 8, 16, 16);
         painter->setBrush(folderColor);
         painter->drawEllipse(x, cy - 5, 10, 10);
         x += 20;
@@ -172,10 +184,11 @@ public:
         QFontMetrics bfm(badgeFont);
         int badgeW = bfm.horizontalAdvance(badge) + 18;
         QRect badgeRect(card.right() - badgeW - 10, cy - 10, badgeW, 20);
-        painter->setBrush(selected ? Theme::primarySoft2() : Theme::surfaceAlt());
+        painter->setBrush(selected ? Theme::withAlpha(Theme::primary(), 40)
+                                   : Theme::glassBgStrong());
         painter->drawRoundedRect(badgeRect, 10, 10);
         painter->setFont(badgeFont);
-        painter->setPen(Theme::textSecondary());
+        painter->setPen(selected ? Theme::primary() : Theme::textSecondary());
         painter->drawText(badgeRect, Qt::AlignCenter, badge);
 
         // 名称
@@ -226,24 +239,32 @@ public:
 
         QRect card = option.rect.adjusted(6, 4, -6, -4);
 
-        // 卡片背景
-        QColor bg = Theme::surface();
+        // 卡片背景：玻璃质感，悬停时透出霓虹光晕
+        QColor bg = Theme::glassBg();
         if (selected) {
-            bg = Theme::primarySoft();
+            bg = Theme::withAlpha(Theme::primary(), Theme::isDark() ? 34 : 26);
         } else if (hover > 0.0) {
-            QColor h = Theme::primarySoft();
-            bg = QColor(255 - static_cast<int>((255 - h.red()) * hover),
-                        255 - static_cast<int>((255 - h.green()) * hover),
-                        255 - static_cast<int>((255 - h.blue()) * hover));
+            const QColor h = Theme::hoverGlow();
+            const QColor base = Theme::glassBg();
+            bg = Theme::mix(base, h, hover);
         }
         painter->setPen(Qt::NoPen);
         painter->setBrush(bg);
         painter->drawRoundedRect(card, Theme::radiusMd, Theme::radiusMd);
 
-        // 标签色条（卡片左缘）
+        // 玻璃高光描边（悬停/选中更亮）
+        painter->setBrush(Qt::NoBrush);
+        const int borderAlpha = selected ? 80 : (hover > 0.0 ? static_cast<int>(26 + 44 * hover) : 22);
+        painter->setPen(QPen(Theme::withAlpha(selected ? Theme::primary() : Theme::glassHighlight(), borderAlpha), 1));
+        painter->drawRoundedRect(card.adjusted(0, 0, -1, -1), Theme::radiusMd, Theme::radiusMd);
+
+        // 标签色条（卡片左缘，带发光）
         if (!tagColor.isEmpty()) {
             QColor c(tagColor);
             if (completed) c = Theme::withAlpha(c, 110);
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(Theme::withAlpha(c, 45));
+            painter->drawRoundedRect(card.left() + 1, card.top() + 6, 7, card.height() - 12, 3, 3);
             painter->setBrush(c);
             painter->drawRoundedRect(card.left() + 2, card.top() + 8, 4, card.height() - 16, 2, 2);
         }
@@ -251,7 +272,10 @@ public:
         // 复选框
         QRect checkRect = checkRectFor(option.rect);
         if (completed) {
-            painter->setBrush(Theme::primary());
+            QLinearGradient grad(checkRect.topLeft(), checkRect.bottomRight());
+            grad.setColorAt(0, Theme::primary());
+            grad.setColorAt(1, Theme::accent());
+            painter->setBrush(grad);
             painter->setPen(Qt::NoPen);
             painter->drawRoundedRect(checkRect, 6, 6);
             QPainterPath checkPath;
@@ -289,10 +313,12 @@ public:
             rightBoundary = pinRect.left() - 4;
         }
 
-        // 优先级点
+        // 优先级点（发光）
         if (priority > 0 && !completed) {
             QColor pc = (priority == 2) ? Theme::danger() : Theme::warning();
             painter->setPen(Qt::NoPen);
+            painter->setBrush(Theme::withAlpha(pc, 55));
+            painter->drawEllipse(x - 3, titleY + 4, 13, 13);
             painter->setBrush(pc);
             painter->drawEllipse(x, titleY + 7, 7, 7);
             x += 14;
@@ -424,7 +450,8 @@ MainWindow::~MainWindow()
 
 void MainWindow::buildUi()
 {
-    QWidget *central = new QWidget(this);
+    // 极光背景作为中央容器：标题栏/导航栏/页面全部半透明，透出流动光斑
+    auto *central = new AuroraBackground(this);
     QVBoxLayout *root = new QVBoxLayout(central);
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
@@ -443,28 +470,16 @@ void MainWindow::buildUi()
     m_searchEdit->setFixedWidth(190);
     m_navBar->addRightWidget(m_searchEdit);
 
-    // 右侧操作按钮
-    auto *desktopBtn = new QPushButton(this);
-    desktopBtn->setProperty("variant", "ghost");
-    desktopBtn->setIcon(Icons::icon(Icons::Desktop, 18, Theme::textSecondary()));
-    desktopBtn->setToolTip(QStringLiteral("桌面小贴士"));
-    desktopBtn->setFixedSize(36, 36);
+    // 右侧操作按钮（悬停霓虹光晕动效）
+    auto *desktopBtn = new NavIconButton(Icons::Desktop, QStringLiteral("桌面小贴士"), this);
     connect(desktopBtn, &QPushButton::clicked, this, &MainWindow::onDesktopWidgetClicked);
     m_navBar->addRightWidget(desktopBtn);
 
-    auto *backupBtn = new QPushButton(this);
-    backupBtn->setProperty("variant", "ghost");
-    backupBtn->setIcon(Icons::icon(Icons::Backup, 18, Theme::textSecondary()));
-    backupBtn->setToolTip(QStringLiteral("立即备份"));
-    backupBtn->setFixedSize(36, 36);
+    auto *backupBtn = new NavIconButton(Icons::Backup, QStringLiteral("立即备份"), this);
     connect(backupBtn, &QPushButton::clicked, this, &MainWindow::onBackupClicked);
     m_navBar->addRightWidget(backupBtn);
 
-    auto *menuBtn = new QPushButton(this);
-    menuBtn->setProperty("variant", "ghost");
-    menuBtn->setIcon(Icons::icon(Icons::List, 18, Theme::textSecondary()));
-    menuBtn->setToolTip(QStringLiteral("菜单"));
-    menuBtn->setFixedSize(36, 36);
+    auto *menuBtn = new NavIconButton(Icons::List, QStringLiteral("菜单"), this);
     m_navBar->addRightWidget(menuBtn);
 
     QMenu *appMenu = new QMenu(this);
@@ -529,10 +544,8 @@ QWidget* MainWindow::buildFolderPanel()
     QWidget *panel = new QWidget(this);
     panel->setMinimumWidth(230);
     panel->setMaximumWidth(300);
-    panel->setStyleSheet(QStringLiteral("QWidget#%1 { background-color: %2; border: 1px solid %4; border-radius: %3px; }")
-                         .arg(QStringLiteral("folderPanel"), Theme::surface().name())
-                         .arg(Theme::radiusLg).arg(Theme::border().name()));
     panel->setObjectName(QStringLiteral("folderPanel"));
+    panel->setStyleSheet(Theme::glassPanelStyle(panel->objectName()));
 
     QVBoxLayout *layout = new QVBoxLayout(panel);
     layout->setContentsMargins(16, 16, 16, 16);
@@ -581,9 +594,7 @@ QWidget* MainWindow::buildTodoPanel()
     QWidget *panel = new QWidget(this);
     panel->setMinimumWidth(380);
     panel->setObjectName(QStringLiteral("todoPanel"));
-    panel->setStyleSheet(QStringLiteral("QWidget#todoPanel { background-color: %1; border: 1px solid %3; border-radius: %2px; }")
-                         .arg(Theme::surfaceAlt().name())
-                         .arg(Theme::radiusLg).arg(Theme::border().name()));
+    panel->setStyleSheet(Theme::glassPanelStyle(panel->objectName()));
 
     QVBoxLayout *layout = new QVBoxLayout(panel);
     layout->setContentsMargins(16, 16, 16, 16);
@@ -632,9 +643,7 @@ QWidget* MainWindow::buildDetailPanel()
     panel->setMinimumWidth(320);
     panel->setMaximumWidth(400);
     panel->setObjectName(QStringLiteral("detailPanel"));
-    panel->setStyleSheet(QStringLiteral("QWidget#detailPanel { background-color: %1; border: 1px solid %3; border-radius: %2px; }")
-                         .arg(Theme::surface().name())
-                         .arg(Theme::radiusLg).arg(Theme::border().name()));
+    panel->setStyleSheet(Theme::glassPanelStyle(panel->objectName()));
 
     QVBoxLayout *panelLayout = new QVBoxLayout(panel);
     panelLayout->setContentsMargins(16, 16, 16, 16);
@@ -665,9 +674,9 @@ QWidget* MainWindow::buildDetailPanel()
     m_emptyStateLabel->setAlignment(Qt::AlignCenter);
     m_emptyStateLabel->setWordWrap(true);
     m_emptyStateLabel->setStyleSheet(
-        QStringLiteral("color: %1; font-size: 13px; padding: 28px 16px; background-color: %2; border-radius: %3px;")
-        .arg(Theme::textMuted().name(), Theme::surfaceAlt().name())
-        .arg(Theme::radiusMd));
+        QStringLiteral("color: %1; font-size: 13px; padding: 28px 16px; background-color: %2; border: 1px dashed %4; border-radius: %3px;")
+        .arg(Theme::textMuted().name(), Theme::glassBg().name(QColor::HexArgb))
+        .arg(Theme::radiusMd).arg(Theme::glassBorder().name(QColor::HexArgb)));
     card->addWidget(m_emptyStateLabel);
 
     card->addWidget(makeLabel(QStringLiteral("标题"), m_detailCard));
@@ -1729,24 +1738,19 @@ void MainWindow::onToggleDarkMode(bool dark)
         f.close();
     }
 
-    // 重新应用构建期烘焙的样式（面板背景、空状态、分节标签等）
-    const auto panelStyle = [](const char *name, const QColor &bg) {
-        return QStringLiteral("QWidget#%1 { background-color: %2; border: 1px solid %3; border-radius: %4px; }")
-            .arg(QLatin1String(name), bg.name(), Theme::border().name())
-            .arg(Theme::radiusLg);
-    };
-    if (QWidget *p = findChild<QWidget*>(QStringLiteral("folderPanel"))) p->setStyleSheet(panelStyle("folderPanel", Theme::surface()));
-    if (QWidget *p = findChild<QWidget*>(QStringLiteral("todoPanel")))   p->setStyleSheet(panelStyle("todoPanel", Theme::surfaceAlt()));
-    if (QWidget *p = findChild<QWidget*>(QStringLiteral("detailPanel"))) p->setStyleSheet(panelStyle("detailPanel", Theme::surface()));
+    // 重新应用构建期烘焙的样式（玻璃面板、空状态、分节标签等）
+    if (QWidget *p = findChild<QWidget*>(QStringLiteral("folderPanel"))) p->setStyleSheet(Theme::glassPanelStyle(QStringLiteral("folderPanel")));
+    if (QWidget *p = findChild<QWidget*>(QStringLiteral("todoPanel")))   p->setStyleSheet(Theme::glassPanelStyle(QStringLiteral("todoPanel")));
+    if (QWidget *p = findChild<QWidget*>(QStringLiteral("detailPanel"))) p->setStyleSheet(Theme::glassPanelStyle(QStringLiteral("detailPanel")));
 
     const QString hintStyle = QStringLiteral("color: %1; font-size: 13px; padding: 20px;")
                               .arg(Theme::textMuted().name());
     m_folderEmptyHint->setStyleSheet(hintStyle);
     m_todoEmptyHint->setStyleSheet(hintStyle);
     m_emptyStateLabel->setStyleSheet(
-        QStringLiteral("color: %1; font-size: 13px; padding: 28px 16px; background-color: %2; border-radius: %3px;")
-        .arg(Theme::textMuted().name(), Theme::surfaceAlt().name())
-        .arg(Theme::radiusMd));
+        QStringLiteral("color: %1; font-size: 13px; padding: 28px 16px; background-color: %2; border: 1px dashed %4; border-radius: %3px;")
+        .arg(Theme::textMuted().name(), Theme::glassBg().name(QColor::HexArgb))
+        .arg(Theme::radiusMd).arg(Theme::glassBorder().name(QColor::HexArgb)));
 
     const QString labelStyle = QStringLiteral("color: %1; font-size: 12px; font-weight: 500;")
                                .arg(Theme::textSecondary().name());

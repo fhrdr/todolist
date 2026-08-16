@@ -21,6 +21,7 @@ SOURCES += \
     src/ui/components/sectionheader.cpp \
     src/ui/components/titlebar.cpp \
     src/ui/components/flowlayout.cpp \
+    src/ui/components/aurorabackground.cpp \
     src/ui/widgets/desktopwidget.cpp \
     src/ui/widgets/calendarwidget.cpp \
     src/ui/widgets/tagwidget.cpp \
@@ -37,6 +38,7 @@ HEADERS += \
     src/ui/components/sectionheader.h \
     src/ui/components/titlebar.h \
     src/ui/components/flowlayout.h \
+    src/ui/components/aurorabackground.h \
     src/ui/components/messageutils.h \
     src/ui/widgets/desktopwidget.h \
     src/ui/widgets/calendarwidget.h \
