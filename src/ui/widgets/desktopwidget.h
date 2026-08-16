@@ -32,6 +32,7 @@ public:
 
     void updateTodoData(const QList<TodoFolder> &folders);
     void refreshDisplay();
+    void refreshTheme();    // 主题切换后重新应用配色（由主窗口调用）
 
 protected:
     void paintEvent(QPaintEvent *event) override;

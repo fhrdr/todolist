@@ -5,14 +5,13 @@
 #include <QPushButton>
 #include <QStringList>
 #include <QStackedWidget>
-#include <QPropertyAnimation>
 #include <QVariantAnimation>
 #include <QPixmap>
 #include "../icons.h"
 
 // 顶部导航栏：左侧应用标识，居中导航项（点击切换页面），
 // 选中项为霓虹描边胶囊指示器，切换时胶囊平滑滑动。
-// 配合 attachStack() 可实现页面切换上滑动画。
+// 配合 attachStack() 可实现页面切换快照交叉淡化过渡。
 class NavBar : public QWidget
 {
     Q_OBJECT
@@ -23,7 +22,7 @@ public:
     void setCurrentIndex(int index);
     int currentIndex() const { return m_currentIndex; }
 
-    // 关联页面容器，切换时带上滑动画
+    // 关联页面容器，切换时带快照交叉淡化过渡
     void attachStack(QStackedWidget *stack);
 
     void addRightWidget(QWidget *w);

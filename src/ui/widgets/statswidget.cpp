@@ -1,6 +1,5 @@
 #include "statswidget.h"
 #include "../theme.h"
-#include "../components/sectionheader.h"
 
 #include <QPainter>
 #include <QPainterPath>
@@ -99,17 +98,18 @@ void drawGradientText(QPainter &painter, const QRect &rect, const QFont &font,
     painter.drawPath(path);
 }
 
-// 卡片绘制入口：应用悬浮上浮位移 + 悬浮霓虹描边发光
+// 卡片绘制入口：悬浮时卡片框架上边缘轻微上移（顶部预留余量，描边不被裁剪）
 void beginCardPaint(QPainter &painter, const QRect &rect, qreal hover)
 {
-    painter.translate(0, -3 * hover);
-    drawGlassCard(painter, rect);
+    const int lift = static_cast<int>(3.0 * hover + 0.5);
+    const QRect cardRect = rect.adjusted(0, 4 - lift, 0, 0);
+    drawGlassCard(painter, cardRect);
     if (hover > 0.01) {
         QColor g = Theme::primary();
         g.setAlpha(static_cast<int>(80 * hover));
         painter.setPen(QPen(g, 1.4));
         painter.setBrush(Qt::NoBrush);
-        painter.drawRoundedRect(QRectF(rect).adjusted(0.5, 0.5, -0.5, -0.5),
+        painter.drawRoundedRect(QRectF(cardRect).adjusted(0.5, 0.5, -0.5, -0.5),
                                 Theme::radiusLg, Theme::radiusLg);
     }
 }
@@ -615,9 +615,6 @@ void StatsWidget::setupUI()
     QVBoxLayout *mainLayout = new QVBoxLayout(content);
     mainLayout->setContentsMargins(kPageMargin, kPageMargin, kPageMargin, kPageMargin);
     mainLayout->setSpacing(kCardSpacing);
-
-    SectionHeader *header = new SectionHeader(QStringLiteral("统计"), content);
-    mainLayout->addWidget(header);
 
     // 第一行：4 张概览卡
     QHBoxLayout *overviewLayout = new QHBoxLayout();

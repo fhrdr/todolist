@@ -7,18 +7,13 @@
 #include <QTimer>
 #include <QResizeEvent>
 #include <QRandomGenerator>
-#include <QCursor>
 #include <cmath>
 
 namespace {
-constexpr qreal kConnectDist = 130.0;    // 粒子间连线距离
+constexpr qreal kConnectDist = 120.0;    // 粒子间连线距离
 constexpr qreal kConnectDist2 = kConnectDist * kConnectDist;
-constexpr qreal kMouseDist   = 190.0;    // 鼠标牵引距离
-constexpr qreal kMouseDist2  = kMouseDist * kMouseDist;
-constexpr qreal kMousePush   = 26.0;     // 鼠标轻微排斥力度（像素/秒²）
-constexpr int   kTimerMs     = 42;       // ~24fps（性能与流畅度折中）
-constexpr int   kIdleTimerMs = 160;      // 窗口失焦时 ~6fps（省电）
-constexpr int   kCacheMs     = 150;      // 底图缓存最低刷新间隔（光晕漂移极慢，低频即可）
+constexpr int   kTimerMs     = 50;       // ~20fps 恒定（纯漂浮动效足够流畅且省电）
+constexpr int   kCacheMs     = 400;      // 底图缓存最低刷新间隔（光晕漂移极慢，低频即可）
 } // namespace
 
 AuroraBackground::AuroraBackground(QWidget *parent)
@@ -33,25 +28,17 @@ AuroraBackground::AuroraBackground(QWidget *parent)
     m_timer = new QTimer(this);
     m_timer->setInterval(kTimerMs);
     connect(m_timer, &QTimer::timeout, this, [this]() {
-        if (!isVisible()) {
+        // 仅窗口最小化/隐藏时暂停（不可见时渲染纯属浪费）；
+        // 失焦不再降帧，保持正常匀速运行
+        QWidget *win = window();
+        if (!isVisible() || (win && win->isMinimized())) {
             m_lastTick = m_clock.elapsed();
             return;
-        }
-        // 窗口失焦时自动降帧省电
-        const bool focused = !window() || window()->isActiveWindow();
-        const int wantInterval = focused ? kTimerMs : kIdleTimerMs;
-        if (m_timer->interval() != wantInterval) {
-            m_timer->setInterval(wantInterval);
         }
 
         const qint64 now = m_clock.elapsed();
         const qreal dt = qMin<qreal>((now - m_lastTick) / 1000.0, 0.1);
         m_lastTick = now;
-
-        // 鼠标位置实时跟踪（即使光标在子控件上也能互动）
-        m_mouse = mapFromGlobal(QCursor::pos());
-        if (!rect().contains(m_mouse.toPoint()))
-            m_mouse = QPointF(-1000, -1000);
 
         if (m_animated) advance(dt);
         // 光晕漂移极慢，底图缓存低频刷新即可
@@ -100,20 +87,20 @@ void AuroraBackground::rebuildScene()
     auto *rng = QRandomGenerator::global();
     const bool dark = Theme::isDark();
 
-    // 两三团极淡光晕做纵深（缓慢漂移）
-    const int orbAlpha = dark ? 34 : 46;
-    m_blobs.append({ QColor(0x22, 0xD3, 0xEE, orbAlpha), 0.16, 0.20, 0.55,
+    // 两三团极淡光晕做纵深（缓慢漂移）；浅色模式用更柔和的 tint
+    const int orbAlpha = dark ? 34 : 52;
+    m_blobs.append({ dark ? QColor(0x22, 0xD3, 0xEE, orbAlpha) : QColor(0xA5, 0xF3, 0xFC, orbAlpha), 0.16, 0.20, 0.55,
                      rng->generateDouble() * 6.28, rng->generateDouble() * 6.28,
                      0.00010, 0.00008, 0.08, 0.06 });
-    m_blobs.append({ QColor(0xA8, 0x55, 0xF7, orbAlpha), 0.86, 0.30, 0.60,
+    m_blobs.append({ dark ? QColor(0xA8, 0x55, 0xF7, orbAlpha) : QColor(0xC4, 0xB5, 0xFD, orbAlpha), 0.86, 0.30, 0.60,
                      rng->generateDouble() * 6.28, rng->generateDouble() * 6.28,
                      0.00007, 0.00011, 0.06, 0.09 });
-    m_blobs.append({ dark ? QColor(0xF4, 0x72, 0xB6, 24) : QColor(0xF9, 0xA8, 0xD4, 40), 0.55, 0.96, 0.62,
+    m_blobs.append({ dark ? QColor(0xF4, 0x72, 0xB6, 24) : QColor(0xF9, 0xA8, 0xD4, 44), 0.55, 0.96, 0.62,
                      rng->generateDouble() * 6.28, rng->generateDouble() * 6.28,
                      0.00009, 0.00006, 0.10, 0.05 });
 
-    // 粒子数量随面积自适应
-    const int count = qBound(30, width() * height() / 16000, 90);
+    // 粒子数量随面积自适应（上限收紧，省电）
+    const int count = qBound(24, width() * height() / 20000, 64);
     for (int i = 0; i < count; ++i) {
         Particle pt;
         pt.x = rng->generateDouble() * qMax(width(), 1);
@@ -143,17 +130,6 @@ void AuroraBackground::advance(qreal dt)
         else if (pt.x > W + 20) pt.x = -20;
         if (pt.y < -20)      pt.y = H + 20;
         else if (pt.y > H + 20) pt.y = -20;
-
-        // 鼠标轻微排斥（靠近时被推开一点）
-        const qreal dx = pt.x - m_mouse.x();
-        const qreal dy = pt.y - m_mouse.y();
-        const qreal d2 = dx * dx + dy * dy;
-        if (d2 > 1.0 && d2 < kMouseDist2) {
-            const qreal d = std::sqrt(d2);
-            const qreal f = (1.0 - d / kMouseDist) * kMousePush * dt;
-            pt.x += dx / d * f * 10.0;
-            pt.y += dy / d * f * 10.0;
-        }
     }
 }
 
@@ -228,7 +204,7 @@ void AuroraBackground::paintEvent(QPaintEvent *event)
 
     // ---- 粒子连线（全程平方距离比较，命中才开方） ----
     const int n = m_particles.size();
-    const qreal maxLineAlpha = dark ? 110.0 : 70.0;
+    const qreal maxLineAlpha = dark ? 110.0 : 100.0;
     for (int i = 0; i < n; ++i) {
         const Particle &a = m_particles[i];
         for (int j = i + 1; j < n; ++j) {
@@ -248,39 +224,15 @@ void AuroraBackground::paintEvent(QPaintEvent *event)
         }
     }
 
-    // ---- 鼠标牵引连线 ----
-    if (m_mouse.x() > -500) {
-        for (const Particle &pt : m_particles) {
-            const qreal dx = pt.x - m_mouse.x();
-            if (std::abs(dx) > kMouseDist) continue;
-            const qreal dy = pt.y - m_mouse.y();
-            if (std::abs(dy) > kMouseDist) continue;
-            const qreal d2 = dx * dx + dy * dy;
-            if (d2 > kMouseDist2) continue;
-
-            const qreal closeness = 1.0 - d2 / kMouseDist2;
-            QColor c = Theme::primary();
-            c.setAlpha(static_cast<int>((dark ? 160.0 : 110.0) * closeness));
-            p.setPen(QPen(c, 1.2));
-            p.drawLine(QPointF(pt.x, pt.y), m_mouse);
-        }
-        // 鼠标处的微光点
-        QColor mc = Theme::primary();
-        mc.setAlpha(90);
-        p.setPen(Qt::NoPen);
-        p.setBrush(mc);
-        p.drawEllipse(m_mouse, 2.5, 2.5);
-    }
-
-    // ---- 粒子点（带微光晕） ----
+    // ---- 粒子点（带微光晕；浅色模式提高不透明度保证可见） ----
     for (const Particle &pt : m_particles) {
         QColor c = particleColor(pt.colorIdx);
         QColor glow = c;
-        glow.setAlpha(dark ? 40 : 26);
+        glow.setAlpha(dark ? 40 : 48);
         p.setPen(Qt::NoPen);
         p.setBrush(glow);
         p.drawEllipse(QPointF(pt.x, pt.y), pt.size * 2.6, pt.size * 2.6);
-        c.setAlpha(dark ? 210 : 160);
+        c.setAlpha(dark ? 210 : 235);
         p.setBrush(c);
         p.drawEllipse(QPointF(pt.x, pt.y), pt.size, pt.size);
     }

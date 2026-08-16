@@ -39,7 +39,7 @@ QPushButton:pressed {
 QPushButton:disabled {
     background-color: rgba(255, 255, 255, 0.6);
     color: #94a3b8;
-    border-color: #e2e8f0;
+    border-color: #c7d1e3;
 }
 
 /* 实心主按钮：靛 -> 青 渐变 */
@@ -101,7 +101,7 @@ QListWidget::item {
 
 /* ---------------- 输入框 ---------------- */
 QLineEdit {
-    border: 1px solid #e2e8f0;
+    border: 1px solid #c7d1e3;
     border-radius: 8px;
     padding: 10px 14px;
     background-color: rgba(255, 255, 255, 0.9);
@@ -116,7 +116,7 @@ QLineEdit:disabled { background-color: #f1f5f9; color: #94a3b8; }
 QLineEdit::placeholder { color: #94a3b8; }
 
 QTextEdit {
-    border: 1px solid #e2e8f0;
+    border: 1px solid #c7d1e3;
     border-radius: 8px;
     padding: 10px;
     background-color: rgba(255, 255, 255, 0.9);
@@ -154,12 +154,12 @@ QCheckBox::indicator:checked {
 
 QCheckBox::indicator:disabled {
     background-color: #f1f5f9;
-    border-color: #e2e8f0;
+    border-color: #c7d1e3;
 }
 
 /* ---------------- 下拉框 ---------------- */
 QComboBox {
-    border: 1px solid #e2e8f0;
+    border: 1px solid #c7d1e3;
     border-radius: 8px;
     padding: 9px 32px 9px 14px;
     background-color: rgba(255, 255, 255, 0.9);
@@ -184,7 +184,7 @@ QComboBox::down-arrow {
 
 QComboBox QAbstractItemView {
     background-color: #ffffff;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #c7d1e3;
     border-radius: 8px;
     selection-background-color: #e0e7ff;
     selection-color: #1e293b;
@@ -269,7 +269,7 @@ QToolTip {
 /* ---------------- 菜单 ---------------- */
 QMenu {
     background-color: rgba(255, 255, 255, 0.98);
-    border: 1px solid #e2e8f0;
+    border: 1px solid #c7d1e3;
     border-radius: 10px;
     padding: 6px;
 }
@@ -287,14 +287,14 @@ QMenu::item:selected {
 
 QMenu::separator {
     height: 1px;
-    background-color: #e2e8f0;
+    background-color: #c7d1e3;
     margin: 5px 10px;
 }
 
 /* ---------------- 状态栏 ---------------- */
 QStatusBar {
     background-color: rgba(255, 255, 255, 0.75);
-    border-top: 1px solid #e2e8f0;
+    border-top: 1px solid #c7d1e3;
     color: #64748b;
     padding: 4px 16px;
     font-size: 12px;

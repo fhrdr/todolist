@@ -1,6 +1,7 @@
 #include "desktopwidget.h"
 #include "../icons.h"
 #include "../theme.h"
+#include "../components/messageutils.h"
 
 #include <QPainter>
 #include <QPainterPath>
@@ -21,9 +22,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
-#include <QInputDialog>
 #include <QUrl>
-#include <QCursor>
 #include <QRandomGenerator>
 #include <QVariantAnimation>
 #include <QEasingCurve>
@@ -198,7 +197,9 @@ public:
             check.moveTo(circle.left() + 4.5, circle.center().y());
             check.lineTo(circle.center().x() - 0.5, circle.bottom() - 4.5);
             check.lineTo(circle.right() - 4, circle.top() + 5);
-            p->setPen(QPen(QColor(0x0B, 0x0E, 0x1A), 2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            // 勾选线：深底用浅色、浅底用白色，保证在渐变填充上可读
+            p->setPen(QPen(Theme::isDark() ? QColor(0x0B, 0x0E, 0x1A) : QColor(255, 255, 255),
+                           2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
             p->setBrush(Qt::NoBrush);
             p->drawPath(check);
         } else {
@@ -456,6 +457,11 @@ void DesktopWidget::applyTheme()
     update();
 }
 
+void DesktopWidget::refreshTheme()
+{
+    applyTheme();
+}
+
 void DesktopWidget::setNoteOpacity(qreal opacity)
 {
     setWindowOpacity(qBound(0.3, opacity, 1.0));
@@ -707,21 +713,25 @@ void DesktopWidget::drawNote(QPainter &p)
         p.drawRoundedRect(note.adjusted(-i, -i + 3, i, i + 3), 14 + i, 14 + i);
     }
 
-    // 玻璃纸：深空渐变底
+    // 玻璃纸：深色为深空渐变，浅色为奶白磨砂渐变
     QLinearGradient grad(note.topLeft(), note.bottomLeft());
-    grad.setColorAt(0, QColor(0x18, 0x1D, 0x33, 240));
-    grad.setColorAt(1, QColor(0x0B, 0x0E, 0x1A, 240));
+    if (Theme::isDark()) {
+        grad.setColorAt(0, QColor(0x18, 0x1D, 0x33, 240));
+        grad.setColorAt(1, QColor(0x0B, 0x0E, 0x1A, 240));
+    } else {
+        grad.setColorAt(0, QColor(0xFF, 0xFF, 0xFF, 243));
+        grad.setColorAt(1, QColor(0xEF, 0xF3, 0xFA, 238));
+    }
     p.setBrush(grad);
     p.setPen(Qt::NoPen);
     p.drawRoundedRect(note, 14, 14);
 
-    // 内部粒子动效（裁剪在玻璃纸内，漂浮 + 邻近连线 + 鼠标牵引）
+    // 内部粒子动效（裁剪在玻璃纸内，漂浮 + 邻近连线，无鼠标交互省电）
     p.save();
     QPainterPath clipPath;
     clipPath.addRoundedRect(note, 14, 14);
     p.setClipPath(clipPath);
 
-    const QPointF mousePos = mapFromGlobal(QCursor::pos());
     const int n = m_particles.size();
     for (int i = 0; i < n; ++i) {
         const NoteParticle &a = m_particles[i];
@@ -733,28 +743,15 @@ void DesktopWidget::drawNote(QPainter &p)
             if (d2 > 70.0 * 70.0) continue;
             const qreal closeness = 1.0 - std::sqrt(d2) / 70.0;
             QColor c = (a.colorIdx % 2 == 0) ? Theme::primary() : Theme::accent();
-            c.setAlpha(static_cast<int>(60 * closeness * closeness));
+            c.setAlpha(static_cast<int>((Theme::isDark() ? 60 : 85) * closeness * closeness));
             p.setPen(QPen(c, 1));
             p.drawLine(QPointF(a.x, a.y), QPointF(b.x, b.y));
-        }
-        // 鼠标牵引线
-        if (note.contains(mousePos.toPoint())) {
-            const qreal dx = a.x - mousePos.x();
-            const qreal dy = a.y - mousePos.y();
-            const qreal d2 = dx * dx + dy * dy;
-            if (d2 < 110.0 * 110.0) {
-                const qreal closeness = 1.0 - std::sqrt(d2) / 110.0;
-                QColor c = Theme::primary();
-                c.setAlpha(static_cast<int>(120 * closeness * closeness));
-                p.setPen(QPen(c, 1));
-                p.drawLine(QPointF(a.x, a.y), mousePos);
-            }
         }
     }
     for (const NoteParticle &pt : m_particles) {
         QColor c = (pt.colorIdx % 3 == 0) ? Theme::neonPink()
                  : (pt.colorIdx % 2 == 0) ? Theme::primary() : Theme::accent();
-        c.setAlpha(170);
+        c.setAlpha(Theme::isDark() ? 170 : 200);
         p.setPen(Qt::NoPen);
         p.setBrush(c);
         p.drawEllipse(QPointF(pt.x, pt.y), pt.size, pt.size);
@@ -930,12 +927,10 @@ void DesktopWidget::onWeatherReply(QNetworkReply *reply)
 
 void DesktopWidget::promptSetCity()
 {
-    bool ok = false;
-    const QString city = QInputDialog::getText(this, QStringLiteral("设置城市"),
-                                               QStringLiteral("输入城市名（如：上海）："),
-                                               QLineEdit::Normal, m_weatherCity, &ok);
-    const QString trimmed = city.trimmed();
-    if (ok && !trimmed.isEmpty() && trimmed != m_weatherCity) {
+    const QString trimmed = MessageUtils::getText(this, QStringLiteral("设置城市"),
+                                                  QStringLiteral("输入城市名（如：上海）："),
+                                                  m_weatherCity).trimmed();
+    if (!trimmed.isEmpty() && trimmed != m_weatherCity) {
         m_weatherCity = trimmed;
         saveAppearance();
         fetchWeather();
@@ -1079,15 +1074,18 @@ bool DesktopWidget::isOnResizeArea(const QPoint &pos)
 void DesktopWidget::contextMenuEvent(QContextMenuEvent *event)
 {
     QMenu menu(this);
+    const QString menuBg = Theme::isDark() ? QStringLiteral("rgba(20, 24, 42, 245)")
+                                           : QStringLiteral("rgba(255, 255, 255, 247)");
     menu.setStyleSheet(QStringLiteral(
-        "QMenu { background-color: rgba(20, 24, 42, 245); border: 1px solid %1;"
+        "QMenu { background-color: %4; border: 1px solid %1;"
         "        border-radius: 8px; padding: 4px; }"
         "QMenu::item { padding: 7px 24px; border-radius: 4px; color: %2; }"
         "QMenu::item:selected { background-color: %3; }"
         "QMenu::item:checked { font-weight: 600; }")
         .arg(Theme::glassBorder().name(QColor::HexArgb),
              Theme::textPrimary().name(),
-             Theme::hoverGlow().name(QColor::HexArgb)));
+             Theme::hoverGlow().name(QColor::HexArgb),
+             menuBg));
 
     // 命中待办项：完成/编辑/删除
     QListWidgetItem *hit = m_todoListWidget->itemAt(m_todoListWidget->mapFromParent(event->pos()));

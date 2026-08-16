@@ -1768,6 +1768,8 @@ void MainWindow::onToggleDarkMode(bool dark)
     // 日历 / 标签页重建样式表（内部自绘色随 paintEvent 自动适配）
     if (m_calendarWidget) m_calendarWidget->refreshTheme();
     if (m_tagWidget)      m_tagWidget->refreshTheme();
+    // 桌面小贴士同步切换主题
+    if (m_desktopWidget)  m_desktopWidget->refreshTheme();
 
     // 自绘控件（标题栏/导航栏/列表代理/日历/标签/统计）统一重绘
     for (QWidget *w : QApplication::topLevelWidgets()) {

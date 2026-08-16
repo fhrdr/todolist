@@ -9,6 +9,51 @@
 #include <QEnterEvent>
 #include <QEasingCurve>
 
+namespace {
+
+// 页面切换过渡层：旧页快照覆盖在新页上淡出。
+// 快照一次性栅格化，动画期只做半透明贴图 blit（无布局/重绘开销，不卡顿）
+class PageFadeOverlay : public QWidget
+{
+public:
+    PageFadeOverlay(const QPixmap &snapshot, QWidget *parent)
+        : QWidget(parent)
+        , m_pm(snapshot)
+    {
+        setAttribute(Qt::WA_TranslucentBackground);
+        setAttribute(Qt::WA_TransparentForMouseEvents);
+        setGeometry(parent->rect());
+        show();
+        raise();
+
+        auto *anim = new QVariantAnimation(this);
+        anim->setDuration(230);
+        anim->setStartValue(1.0);
+        anim->setEndValue(0.0);
+        anim->setEasingCurve(QEasingCurve::OutCubic);
+        connect(anim, &QVariantAnimation::valueChanged, this, [this](const QVariant &v) {
+            m_opacity = v.toReal();
+            update();
+        });
+        connect(anim, &QVariantAnimation::finished, this, &QObject::deleteLater);
+        anim->start(QAbstractAnimation::DeleteWhenStopped);
+    }
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter p(this);
+        p.setOpacity(m_opacity);
+        p.drawPixmap(0, 0, m_pm);
+    }
+
+private:
+    QPixmap m_pm;
+    qreal m_opacity = 1.0;
+};
+
+} // namespace
+
 NavBar::NavBar(const QString &appName, const QStringList &items, QWidget *parent)
     : QWidget(parent)
     , m_appName(appName)
@@ -102,20 +147,33 @@ void NavBar::slideToPage(int index)
     if (!m_stack || index >= m_stack->count()) {
         return;
     }
+
+    // 切换前抓取旧页快照（必须在切页前截取，否则旧页被隐藏）。
+    // 注意：不能用 grab()——它对无 WA_TranslucentBackground 的控件
+    // 会用调色板默认底色（白）填充未绘制区域，暗色模式下就是白屏。
+    // 这里手动透明底 + render，保留页面真实的透明区域。
+    QWidget *oldPage = m_stack->currentWidget();
+    QPixmap snapshot;
+    if (oldPage && oldPage->isVisible() && oldPage->width() > 0 && oldPage->height() > 0) {
+        const qreal dpr = oldPage->devicePixelRatioF();
+        snapshot = QPixmap(oldPage->size() * dpr);
+        snapshot.setDevicePixelRatio(dpr);
+        snapshot.fill(Qt::transparent);
+        QPainter p(&snapshot);
+        oldPage->render(&p, QPoint(), QRegion(), QWidget::DrawChildren);
+    }
+
     m_stack->setCurrentIndex(index);
     QWidget *page = m_stack->currentWidget();
     if (!page) {
         return;
     }
 
-    // 仅保留轻量上滑进入：不做整页透明度栅格化（切换卡顿/高功耗的主要来源）
-    const QPoint endPos = page->pos();
-    auto *slide = new QPropertyAnimation(page, "pos", page);
-    slide->setDuration(260);
-    slide->setStartValue(endPos + QPoint(0, 14));
-    slide->setEndValue(endPos);
-    slide->setEasingCurve(QEasingCurve::OutCubic);
-    slide->start(QAbstractAnimation::DeleteWhenStopped);
+    // 快照覆盖在新页上淡出：动画期每帧仅一次半透明 blit，
+    // 不再移动布局管理的页面（原 pos 动画与 QStackedLayout 冲突导致卡顿）
+    if (!snapshot.isNull()) {
+        new PageFadeOverlay(snapshot, page);   // 自管理：动画结束自动销毁
+    }
 }
 
 void NavBar::resizeEvent(QResizeEvent *event)

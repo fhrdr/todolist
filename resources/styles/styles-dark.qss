@@ -39,7 +39,7 @@ QPushButton:pressed {
 QPushButton:disabled {
     background-color: rgba(255, 255, 255, 0.03);
     color: #6e7e9c;
-    border-color: #2a334e;
+    border-color: #2e3854;
 }
 
 /* 实心主按钮：青 -> 靛 渐变 */
@@ -101,7 +101,7 @@ QListWidget::item {
 
 /* ---------------- 输入框 ---------------- */
 QLineEdit {
-    border: 1px solid #2a334e;
+    border: 1px solid #2e3854;
     border-radius: 8px;
     padding: 10px 14px;
     background-color: rgba(255, 255, 255, 0.05);
@@ -116,7 +116,7 @@ QLineEdit:disabled { background-color: rgba(255, 255, 255, 0.03); color: #6e7e9c
 QLineEdit::placeholder { color: #6e7e9c; }
 
 QTextEdit {
-    border: 1px solid #2a334e;
+    border: 1px solid #2e3854;
     border-radius: 8px;
     padding: 10px;
     background-color: rgba(255, 255, 255, 0.05);
@@ -154,12 +154,12 @@ QCheckBox::indicator:checked {
 
 QCheckBox::indicator:disabled {
     background-color: rgba(255, 255, 255, 0.03);
-    border-color: #2a334e;
+    border-color: #2e3854;
 }
 
 /* ---------------- 下拉框 ---------------- */
 QComboBox {
-    border: 1px solid #2a334e;
+    border: 1px solid #2e3854;
     border-radius: 8px;
     padding: 9px 32px 9px 14px;
     background-color: rgba(255, 255, 255, 0.05);
@@ -184,7 +184,7 @@ QComboBox::down-arrow {
 
 QComboBox QAbstractItemView {
     background-color: #171c30;
-    border: 1px solid #2a334e;
+    border: 1px solid #2e3854;
     border-radius: 8px;
     selection-background-color: rgba(34, 211, 238, 0.18);
     selection-color: #eaf0fa;
@@ -269,7 +269,7 @@ QToolTip {
 /* ---------------- 菜单 ---------------- */
 QMenu {
     background-color: rgba(23, 28, 48, 0.98);
-    border: 1px solid #2a334e;
+    border: 1px solid #2e3854;
     border-radius: 10px;
     padding: 6px;
 }
@@ -287,7 +287,7 @@ QMenu::item:selected {
 
 QMenu::separator {
     height: 1px;
-    background-color: #2a334e;
+    background-color: #2e3854;
     margin: 5px 10px;
 }
 
