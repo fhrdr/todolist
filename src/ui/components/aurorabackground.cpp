@@ -119,6 +119,8 @@ void AuroraBackground::rebuildScene()
     // 粒子数量随面积自适应（上限收紧，省电）
     const int area = width() * height();
     switch (m_effect) {
+    case None:
+        break;      // 无粒子，仅保留底色光晕
     case Fireflies: {
         const int count = qBound(16, area / 32000, 36);
         for (int i = 0; i < count; ++i) {
@@ -549,6 +551,7 @@ void AuroraBackground::paintEvent(QPaintEvent *event)
 
     // ---- 粒子层：按当前动效绘制 ----
     switch (m_effect) {
+    case None:                                   break;   // 无粒子
     case Fireflies:     paintFireflies(p);     break;
     case Bubbles:       paintBubbles(p);       break;
     case Snowfall:      paintSnowfall(p);      break;

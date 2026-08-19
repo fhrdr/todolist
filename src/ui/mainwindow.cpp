@@ -523,9 +523,9 @@ void MainWindow::buildUi()
     auto *bgGroup = new QActionGroup(bgMenu);
     bgGroup->setExclusive(true);
     const QStringList bgNames = {
-        QStringLiteral("星点连线"), QStringLiteral("萤火流光"),
-        QStringLiteral("气泡上升"), QStringLiteral("雪花飘落"),
-        QStringLiteral("流星划过")
+        QStringLiteral("无"), QStringLiteral("星点连线"),
+        QStringLiteral("萤火流光"), QStringLiteral("气泡上升"),
+        QStringLiteral("雪花飘落"), QStringLiteral("流星划过")
     };
     for (int i = 0; i < bgNames.size() && i < AuroraBackground::EffectCount; ++i) {
         QAction *a = bgMenu->addAction(bgNames[i]);

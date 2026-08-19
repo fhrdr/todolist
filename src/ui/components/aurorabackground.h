@@ -16,13 +16,14 @@ class AuroraBackground : public QWidget
     Q_OBJECT
 
 public:
-    // 背景粒子动效类型
+    // 背景粒子动效类型（None = 仅保留底色光晕，无粒子）
     enum Effect {
-        Constellation = 0,   // 星点连线（经典 plexus）
-        Fireflies,           // 萤火流光（缓慢游弋 + 呼吸明灭）
-        Bubbles,             // 气泡上升（摇摆上浮 + 圆环）
-        Snowfall,            // 雪花飘落（左右摇摆下落）
-        Meteors,             // 流星划过（繁星闪烁 + 拖尾流星）
+        None = 0,              // 无粒子动效（默认）
+        Constellation,         // 星点连线（经典 plexus）
+        Fireflies,             // 萤火流光（缓慢游弋 + 呼吸明灭）
+        Bubbles,               // 气泡上升（摇摆上浮 + 圆环）
+        Snowfall,              // 雪花飘落（左右摇摆下落）
+        Meteors,               // 流星划过（繁星闪烁 + 拖尾流星）
         EffectCount
     };
 
@@ -72,7 +73,7 @@ private:
     qint64 m_lastTick = 0;      // 上一帧时间戳（毫秒），用于计算 dt
     QTimer *m_timer = nullptr;
     bool m_animated = true;
-    int m_effect = Constellation;
+    int m_effect = None;
 
     QPixmap m_baseCache;        // 底色 + 光晕半分辨率缓存
     qint64 m_lastCacheMs = -10000;
